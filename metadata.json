@@ -1,0 +1,6 @@
+{
+  "name": "Wisdom Bridge",
+  "description": "An intergenerational learning network built around communities, conversations, mentorship, and shared life experiences.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

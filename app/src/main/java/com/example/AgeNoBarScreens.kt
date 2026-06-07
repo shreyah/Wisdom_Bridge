@@ -2160,7 +2160,10 @@ fun HomeDashboardScreen(
                                 .weight(1f)
                                 .height(112.dp)
                                 .bulletinHaloWrapper()
-                                .clickable { viewModel.selectTab(AppTab.Messages) }
+                                .clickable {
+                                    viewModel.selectDirectConversation(null)
+                                    viewModel.selectTab(AppTab.Messages)
+                                }
                                 .testTag("chachi_banner_card_trigger")
                         ) {
                             Box(
@@ -8381,7 +8384,7 @@ fun ExpertCardItem(
                     Icon(Icons.Filled.Star, "Rating Star", modifier = Modifier.size(16.dp), tint = Color(0xFFF1C40F))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "${expert.rating}",
+                        text = String.format(java.util.Locale.US, "%.2f", expert.rating),
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp
                     )
@@ -8625,7 +8628,8 @@ fun WisdomProfileDetailView(
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Filled.Star, "Rating star", modifier = Modifier.size(14.dp), tint = Color(0xFFF1C40F))
-                                    Text(" ${expert.rating} • ", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    val formattedRating = String.format(java.util.Locale.US, "%.2f", expert.rating)
+                                    Text(" $formattedRating • ", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     Text("${expert.testimonialsCount} custom reviews", fontSize = 11.sp, color = Color.Gray)
                                 }
                             }
@@ -9656,6 +9660,12 @@ fun MessagesScreen(
     var userDraftMsg by remember { mutableStateOf("") }
     val lazyListState = rememberLazyListState()
 
+    LaunchedEffect(selectedDirectConvId) {
+        if (selectedDirectConvId == null) {
+            activeInboxTab = "Chachi"
+        }
+    }
+
     // Slide/Scroll automatic focus when new messages arrive
     LaunchedEffect(chachiChat.size, isChachiTyping) {
         if (chachiChat.isNotEmpty()) {
@@ -10082,8 +10092,9 @@ fun MessagesScreen(
                                                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                                                         )
                                                                     }
+                                                                    val formattedRating = String.format(java.util.Locale.US, "%.2f", expert.rating)
                                                                     Text(
-                                                                        "⭐ ${expert.rating}",
+                                                                        "⭐ $formattedRating",
                                                                         style = MaterialTheme.typography.bodyMedium,
                                                                         fontWeight = FontWeight.SemiBold,
                                                                         color = Color(0xFFD4AF37)
@@ -12303,7 +12314,7 @@ fun PremiumLinkedInMentorCard(
                     modifier = Modifier.size(15.dp),
                     tint = Color(0xFFF1C40F)
                 )
-                val formattedRating = String.format(java.util.Locale.US, "%.1f", expert.rating)
+                val formattedRating = String.format(java.util.Locale.US, "%.2f", expert.rating)
                 Text(
                     text = formattedRating,
                     fontWeight = FontWeight.Bold,
@@ -12625,8 +12636,8 @@ fun CompactLinkedInMentorCard(
                         }
                     }
                     
-                    // Star rating below avatar (e.g. ⭐ 4.8)
-                    val formattedRating = remember(expert.rating) { String.format(java.util.Locale.US, "%.1f", expert.rating) }
+                    // Star rating below avatar (e.g. ⭐ 4.88)
+                    val formattedRating = remember(expert.rating) { String.format(java.util.Locale.US, "%.2f", expert.rating) }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -14460,8 +14471,9 @@ fun DetailFeaturedExpertCard(
                         modifier = Modifier.size(12.dp)
                     )
                     Spacer(modifier = Modifier.width(2.dp))
+                    val formattedRating = String.format(java.util.Locale.US, "%.2f", expert.rating)
                     Text(
-                        text = "${expert.rating} (${expert.testimonialsCount})",
+                        text = "$formattedRating (${expert.testimonialsCount})",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -15569,7 +15581,8 @@ fun PremiumBookingCalendarScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(top = 2.dp)
                                 ) {
-                                    Text("⭐ 4.9 Rating", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFFF39C12))
+                                    val formattedRating = String.format(java.util.Locale.US, "%.2f", expert.rating)
+                                    Text("⭐ $formattedRating Rating", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFFF39C12))
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Text("₹299 / 30 mins session", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
                                 }
@@ -16313,7 +16326,8 @@ fun SearchAndAiRecommendationsScreen(
                     Text(expert.languages.joinToString(", "), fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(text = "Experience & Rating:", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    Text("${expert.yearsOfExperience} years • Rating: ⭐ ${expert.rating}", fontSize = 12.sp)
+                    val formattedRating = String.format(java.util.Locale.US, "%.2f", expert.rating)
+                    Text("${expert.yearsOfExperience} years • Rating: ⭐ $formattedRating", fontSize = 12.sp)
                 }
             },
             confirmButton = {

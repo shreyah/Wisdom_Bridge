@@ -1566,7 +1566,8 @@ data class CalendarDay(
     val key: String,
     val fullName: String,
     val labelNum: String,
-    val isToday: Boolean = false
+    val isToday: Boolean = false,
+    val dateString: String = ""
 )
 
 fun Modifier.whiteCardShadow(): Modifier = this.drawBehind {
@@ -1836,10 +1837,9 @@ fun HomeDashboardScreen(
 
     val calendarDays = remember {
         val today = java.time.LocalDate.now()
-        val currentMonday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
-        (0..6).map { i ->
-            val date = currentMonday.plusDays(i.toLong())
-            val isDateToday = date.isEqual(today)
+        (-7..7).map { offset ->
+            val date = today.plusDays(offset.toLong())
+            val isDateToday = offset == 0
             val shortName = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()) // "Mon", "Tue"...
             val fullName = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault()) // "Monday", "Tuesday"...
             val labelNum = date.dayOfMonth.toString()
@@ -1847,7 +1847,8 @@ fun HomeDashboardScreen(
                 key = shortName.take(3), // e.g. "Mon"
                 fullName = fullName,
                 labelNum = labelNum,
-                isToday = isDateToday
+                isToday = isDateToday,
+                dateString = date.toString()
             )
         }
     }
@@ -1862,7 +1863,7 @@ fun HomeDashboardScreen(
     }
 
     val initiallySelectedDay = remember(calendarDays) {
-        calendarDays.find { it.isToday }?.key ?: "Mon"
+        calendarDays.find { it.isToday }?.dateString ?: ""
     }
     var selectedCalendarDay by remember(initiallySelectedDay) { mutableStateOf(initiallySelectedDay) }
 
@@ -2727,17 +2728,26 @@ fun HomeDashboardScreen(
                     
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    Row(
+                    val calendarListState = rememberLazyListState()
+                    val todayIndex = remember(calendarDays) { calendarDays.indexOfFirst { it.isToday } }
+                    LaunchedEffect(todayIndex) {
+                        if (todayIndex != -1) {
+                            calendarListState.scrollToItem(maxOf(0, todayIndex - 2))
+                        }
+                    }
+
+                    LazyRow(
+                        state = calendarListState,
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(Color.White.copy(alpha = 0.6f), RoundedCornerShape(26.dp))
                             .border(BorderStroke(1.dp, Color.White), RoundedCornerShape(26.dp))
-                            .padding(8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                            .padding(vertical = 8.dp, horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        calendarDays.forEach { day ->
-                            val isSelected = selectedCalendarDay == day.key
+                        items(calendarDays) { day ->
+                            val isSelected = selectedCalendarDay == day.dateString
                             val hasBooking = bookingsList.any { b ->
                                 val bTiming = b.timing.lowercase()
                                 val dayKey = day.key.lowercase()
@@ -2750,7 +2760,7 @@ fun HomeDashboardScreen(
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 modifier = Modifier
-                                    .weight(1f)
+                                    .width(55.dp)
                                     .padding(horizontal = 2.dp)
                                     .shadow(
                                         elevation = if (isSelected) 3.dp else 0.dp,
@@ -2771,7 +2781,7 @@ fun HomeDashboardScreen(
                                         color = if (day.isToday && !isSelected) Color(0xFFEADCF8) else Color.Transparent,
                                         shape = RoundedCornerShape(20.dp)
                                     )
-                                    .clickable { selectedCalendarDay = day.key }
+                                    .clickable { selectedCalendarDay = day.dateString }
                                     .padding(vertical = 8.dp)
                             ) {
                                 Text(
@@ -2821,7 +2831,7 @@ fun HomeDashboardScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     // Display events for the selected calendar day
-                    val activeDayObject = calendarDays.find { it.key == selectedCalendarDay } ?: calendarDays[0]
+                    val activeDayObject = calendarDays.find { it.dateString == selectedCalendarDay } ?: calendarDays[0]
                     val eventsForDay = getEventsForDay(activeDayObject, events)
                     val bookingsForDay = bookingsList.filter { b ->
                         val bTiming = b.timing.lowercase()

@@ -1496,6 +1496,167 @@ class AgeNoBarViewModel : ViewModel() {
         _selectedRescheduleBookingId.value = null
     }
 
+    // -- APPOINTMENT MODIFICATION & EDIT STATE --
+    private val _editingBooking = MutableStateFlow<Booking?>(null)
+    val editingBooking = _editingBooking.asStateFlow()
+
+    fun setEditingBooking(booking: Booking?) {
+        _editingBooking.value = booking
+    }
+
+    private val _activeClassroomBooking = MutableStateFlow<Booking?>(null)
+    val activeClassroomBooking = _activeClassroomBooking.asStateFlow()
+
+    fun setActiveClassroomBooking(booking: Booking?) {
+        _activeClassroomBooking.value = booking
+    }
+
+    fun joinBooking(bookingId: String) {
+        val currentBookings = _bookingsList.value
+        val bookingIndex = currentBookings.indexOfFirst { it.id == bookingId }
+        
+        android.util.Log.d("AgeNoBarDB", "joinBooking: ID = $bookingId")
+        
+        if (bookingIndex != -1) {
+            val booking = currentBookings[bookingIndex]
+            viewModelScope.launch(Dispatchers.IO) {
+                // Insert booking with status 'joined' in background DB
+                bookingDao?.insertBooking(
+                    DbBooking(
+                        id = booking.id,
+                        expert_id = booking.expertId,
+                        learner_id = "user_senior_101",
+                        slot_time = booking.timing,
+                        status = "joined",
+                        duration_minutes = booking.durationMinutes,
+                        is_voice = booking.isVoice,
+                        is_video = booking.isVideo,
+                        created_at = System.currentTimeMillis()
+                    )
+                )
+                withContext(Dispatchers.Main) {
+                    val updatedBooking = booking.copy(status = "Joined")
+                    val mutableList = currentBookings.toMutableList()
+                    mutableList[bookingIndex] = updatedBooking
+                    _bookingsList.value = mutableList
+                    
+                    saveBookings()
+                    _activeClassroomBooking.value = updatedBooking
+                }
+            }
+        }
+    }
+
+    fun updateBookingDetails(
+        bookingId: String,
+        newTiming: String,
+        newDuration: Int,
+        isVoice: Boolean,
+        isVideo: Boolean
+    ) {
+        val currentBookings = _bookingsList.value
+        val bookingIndex = currentBookings.indexOfFirst { it.id == bookingId }
+        val expertId = if (bookingIndex != -1) currentBookings[bookingIndex].expertId else ""
+        val expert = _experts.value.find { it.id == expertId }
+        
+        android.util.Log.d("AgeNoBarDB", "updateBookingDetails: ID = $bookingId timing = $newTiming, duration = $newDuration, voice = $isVoice, video = $isVideo")
+        
+        if (bookingIndex != -1 && expert != null) {
+            val oldBooking = currentBookings[bookingIndex]
+            val oldTiming = oldBooking.timing
+            val currentUserName = _currentUser.value.name
+            
+            viewModelScope.launch(Dispatchers.IO) {
+                // Insert or Replace standard DB booking
+                bookingDao?.insertBooking(
+                    DbBooking(
+                        id = bookingId,
+                        expert_id = expertId,
+                        learner_id = "user_senior_101",
+                        slot_time = newTiming,
+                        status = "confirmed",
+                        duration_minutes = newDuration,
+                        is_voice = isVoice,
+                        is_video = isVideo,
+                        created_at = System.currentTimeMillis()
+                    )
+                )
+                
+                // If timing has changed, reset old slot status so it is clear, and set new slot
+                if (oldTiming != newTiming) {
+                    try {
+                        val oldDay = oldTiming.substringBefore(" • ").trim().uppercase()
+                        val oldTimePart = oldTiming.substringAfter(" • ").trim()
+                        val oldStartTime = if (oldTimePart.contains(" - ")) oldTimePart.substringBefore(" - ").trim() else oldTimePart
+                        val oldSlotId = "${expertId}_${oldDay}_$oldStartTime"
+                        
+                        slotDao?.updateSlotStatus(oldSlotId, "free", null)
+                    } catch (e: java.lang.Exception) {
+                        android.util.Log.e("AgeNoBarDB", "Error freeing old slot", e)
+                    }
+                    
+                    try {
+                        val newDay = newTiming.substringBefore(" • ").trim().uppercase()
+                        val newTimePart = newTiming.substringAfter(" • ").trim()
+                        val newStartTime = if (newTimePart.contains(" - ")) newTimePart.substringBefore(" - ").trim() else newTimePart
+                        val newSlotId = "${expertId}_${newDay}_$newStartTime"
+                        
+                        slotDao?.updateSlotStatus(newSlotId, "booked", currentUserName)
+                    } catch (e: java.lang.Exception) {
+                        android.util.Log.e("AgeNoBarDB", "Error booking new slot", e)
+                    }
+                }
+                
+                withContext(Dispatchers.Main) {
+                    saveBookings()
+                    _editingBooking.value = null
+                }
+                
+                startDirectChat(
+                    expertId = expertId,
+                    initialText = "Dear ${expert.name}, I have updated our scheduled session details to: $newTiming ($newDuration mins, ${if (isVideo) "Video Call 🎥" else "Voice Call 📞"})."
+                )
+            }
+        }
+    }
+
+    fun cancelBooking(bookingId: String) {
+        val currentBookings = _bookingsList.value
+        val bookingIndex = currentBookings.indexOfFirst { it.id == bookingId }
+        val expertId = if (bookingIndex != -1) currentBookings[bookingIndex].expertId else ""
+        val expert = _experts.value.find { it.id == expertId }
+        
+        if (bookingIndex != -1 && expert != null) {
+            val oldBooking = currentBookings[bookingIndex]
+            val oldTiming = oldBooking.timing
+            
+            viewModelScope.launch(Dispatchers.IO) {
+                bookingDao?.deleteBooking(bookingId)
+                
+                try {
+                    val oldDay = oldTiming.substringBefore(" • ").trim().uppercase()
+                    val oldTimePart = oldTiming.substringAfter(" • ").trim()
+                    val oldStartTime = if (oldTimePart.contains(" - ")) oldTimePart.substringBefore(" - ").trim() else oldTimePart
+                    val oldSlotId = "${expertId}_${oldDay}_$oldStartTime"
+                    
+                    slotDao?.updateSlotStatus(oldSlotId, "free", null)
+                } catch (e: java.lang.Exception) {
+                    android.util.Log.e("AgeNoBarDB", "Error clearing slot for canceled booking", e)
+                }
+                
+                withContext(Dispatchers.Main) {
+                    saveBookings()
+                    _editingBooking.value = null
+                }
+                
+                startDirectChat(
+                    expertId = expertId,
+                    initialText = "Dear ${expert.name}, I have unfortunately cancelled my scheduled session on $oldTiming. I will book a different slot when convenient!"
+                )
+            }
+        }
+    }
+
     // -- INITIALIZE PERSISTENT STORAGE CONTEXT --
     private var hasPreseededBookings = false
 
@@ -1504,9 +1665,14 @@ class AgeNoBarViewModel : ViewModel() {
         val currentExperts = expertDaoSafe.getAllExperts()
         val deservesCleanRebuild = currentExperts.isEmpty() || currentExperts.any { 
             it.topic.contains(" ") || it.topic != it.topic.lowercase() 
-        }
+        } || (sharedPrefs?.getBoolean("db_seeded_v5", false) == false)
         if (deservesCleanRebuild) {
             expertDaoSafe.clearAllExperts()
+            try {
+                bookingDao?.clearAllBookings()
+            } catch (e: Exception) {
+                android.util.Log.e("AgeNoBarDB", "Error clearing bookings", e)
+            }
             val generated = loadGeneratedExpertsForBridge()
             val dbExperts = generated.map { exp ->
                 DbExpert(
@@ -1585,8 +1751,8 @@ class AgeNoBarViewModel : ViewModel() {
                 days.forEach { day ->
                     times.forEachIndexed { index, time ->
                         val slotId = "${expert.id}_${day}_${time}"
-                        val isBookedByOther = (index == 1 || index == 3) && expert.id != "exp_rajesh"
-                        val isBookedByMe = index == 4 && expert.id == "exp_rajesh"
+                        val isBookedByOther = (index == 1 || index == 3) && expert.id != "exp_seed_maths_0"
+                        val isBookedByMe = index == 4 && expert.id == "exp_seed_maths_0"
                         preseededSlots.add(
                             DbSlot(
                                 id = slotId,
@@ -1611,7 +1777,7 @@ class AgeNoBarViewModel : ViewModel() {
             bookingDaoSafe.insertBooking(
                 DbBooking(
                     id = "b_default_1",
-                    expert_id = "exp_rajesh",
+                    expert_id = "exp_seed_maths_0",
                     learner_id = "user_senior_101",
                     slot_time = "WED • 04:00 PM - 04:30 PM",
                     status = "confirmed",
@@ -1624,7 +1790,7 @@ class AgeNoBarViewModel : ViewModel() {
             bookingDaoSafe.insertBooking(
                 DbBooking(
                     id = "b_default_2",
-                    expert_id = "exp_anand",
+                    expert_id = "exp_seed_finance_1",
                     learner_id = "user_senior_101",
                     slot_time = "MON • 10:00 AM - 10:30 AM",
                     status = "cancelled",
@@ -1637,6 +1803,7 @@ class AgeNoBarViewModel : ViewModel() {
             android.util.Log.d("AgeNoBarDB", "booking inserted: preseeded default bookings")
             println("DATABASE VERIFICATION: preseeded bookings inserted")
             hasPreseededBookings = true
+            sharedPrefs?.edit()?.putBoolean("db_seeded_v5", true)?.apply()
         }
     }
 }
@@ -1665,7 +1832,11 @@ class AgeNoBarViewModel : ViewModel() {
                     val matchedExpert = expertsList.find { it.id == dbB.expert_id }
                     val expertName = matchedExpert?.name ?: "Expert"
                     val expertAvatar = matchedExpert?.avatarUrl ?: "avatar_default"
-                    val displayStatus = if (dbB.id == "b_default_2" || dbB.status == "past" || dbB.status == "cancelled") "Past" else "Upcoming"
+                    val displayStatus = when {
+                        dbB.id == "b_default_2" || dbB.status == "past" || dbB.status == "cancelled" -> "Past"
+                        dbB.status == "joined" -> "Joined"
+                        else -> "Upcoming"
+                    }
                     
                     Booking(
                         id = dbB.id,
@@ -1909,7 +2080,7 @@ class AgeNoBarViewModel : ViewModel() {
 
     fun initPrefs(context: android.content.Context) {
         if (sharedPrefs == null) {
-            sharedPrefs = context.getSharedPreferences("wisdom_bridge_prefs_v2", android.content.Context.MODE_PRIVATE)
+            sharedPrefs = context.getSharedPreferences("wisdom_bridge_prefs_v5", android.content.Context.MODE_PRIVATE)
             
             val db = AgeNoBarDatabase.getDatabase(context)
             database = db
@@ -1936,18 +2107,32 @@ class AgeNoBarViewModel : ViewModel() {
 
     private fun deserializeBooking(s: String): Booking? {
         val parts = s.split("#")
-        if (parts.size < 9) return null
-        return Booking(
-            id = parts[0],
-            expertId = parts[1],
-            expertName = parts[2],
-            expertAvatar = parts[3],
-            timing = parts[4],
-            durationMinutes = parts[5].toIntOrNull() ?: 30,
-            status = parts[6],
-            isVoice = parts[7].toBoolean(),
-            isVideo = parts[8].toBoolean()
-        )
+        if (parts.size >= 9) {
+            return Booking(
+                id = parts[0],
+                expertId = parts[1],
+                expertName = parts[2],
+                expertAvatar = parts[3],
+                timing = parts[4],
+                durationMinutes = parts[5].toIntOrNull() ?: 30,
+                status = parts[6],
+                isVoice = parts[7].toBoolean(),
+                isVideo = parts[8].toBoolean()
+            )
+        } else if (parts.size >= 7) {
+            return Booking(
+                id = parts[0],
+                expertId = parts[1],
+                expertName = parts[2],
+                expertAvatar = parts[3],
+                timing = parts[4],
+                durationMinutes = parts[5].toIntOrNull() ?: 30,
+                status = parts[6],
+                isVoice = true,
+                isVideo = false
+            )
+        }
+        return null
     }
 
     private fun saveBookings() {
@@ -1971,18 +2156,18 @@ class AgeNoBarViewModel : ViewModel() {
             _bookingsList.value = listOf(
                 Booking(
                     id = "b_default_1",
-                    expertId = "exp_rajesh",
+                    expertId = "exp_seed_maths_0",
                     expertName = "Rajesh Sharma",
-                    expertAvatar = "avatar_rajesh",
+                    expertAvatar = "avatar_rajesh_sharma",
                     timing = "Wednesday, 4:00 PM",
                     durationMinutes = 30,
                     status = "Upcoming"
                 ),
                 Booking(
                     id = "b_default_2",
-                    expertId = "exp_anand",
+                    expertId = "exp_seed_finance_1",
                     expertName = "Anand Shah",
-                    expertAvatar = "avatar_anand",
+                    expertAvatar = "avatar_anand_shah",
                     timing = "Yesterday, 10:30 AM",
                     durationMinutes = 30,
                     status = "Past"
@@ -2049,10 +2234,10 @@ class AgeNoBarViewModel : ViewModel() {
             // Seed initial expert message thread so there's never an empty screen!
             val seedConvs = listOf(
                 DirectConversation(
-                    id = "exp_rajesh",
-                    recipientId = "exp_rajesh",
+                    id = "exp_seed_maths_0",
+                    recipientId = "exp_seed_maths_0",
                     recipientName = "Rajesh Sharma",
-                    recipientAvatar = "avatar_rajesh",
+                    recipientAvatar = "avatar_rajesh_sharma",
                     lastMessageText = "Pranam Ramesh ji! Dhanyaavaad for requesting assistance. I will prepare simple materials for Vedic arithmetic.",
                     lastMessageTimestamp = "11:00 AM",
                     messages = listOf(
@@ -2065,7 +2250,7 @@ class AgeNoBarViewModel : ViewModel() {
                         ),
                         DirectMessage(
                             id = "msg_seed_2",
-                            senderId = "exp_rajesh",
+                            senderId = "exp_seed_maths_0",
                             senderName = "Rajesh Sharma",
                             text = "Pranam Ramesh ji! Dhanyaavaad for requesting assistance. I will prepare simple materials for Vedic arithmetic.",
                             timestamp = "11:00 AM"
@@ -2074,7 +2259,7 @@ class AgeNoBarViewModel : ViewModel() {
                 )
             )
             _directConversations.value = seedConvs
-            _selectedDirectConversationId.value = "exp_rajesh"
+            _selectedDirectConversationId.value = "exp_seed_maths_0"
             saveConversations()
         }
     }
@@ -2198,7 +2383,7 @@ class AgeNoBarViewModel : ViewModel() {
     }
 
     // -- REPLACES MOCK BOOKING CORE LOGIC --
-    fun bookSessionWithExpert(expertId: String, selectedTime: String, durationMinutes: Int = 30, isVideo: Boolean = false) {
+    fun bookSessionWithExpert(expertId: String, selectedTime: String, durationMinutes: Int = 30, isVideo: Boolean = false, onComplete: (() -> Unit)? = null) {
         val expert = _experts.value.find { it.id == expertId } ?: return
         
         android.util.Log.d("AgeNoBarDB", "bookSessionWithExpert: active trigger for $expertId at $selectedTime")
@@ -2242,6 +2427,7 @@ class AgeNoBarViewModel : ViewModel() {
             withContext(Dispatchers.Main) {
                 _bookedSessionExpertIds.update { it + (expertId to selectedTime) }
                 saveBookings()
+                onComplete?.invoke()
             }
             
             // Write notification intro chat to thread

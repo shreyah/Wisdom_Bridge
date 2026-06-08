@@ -99,6 +99,9 @@ interface BookingDao {
 
     @Query("DELETE FROM bookings WHERE id = :bookingId")
     suspend fun deleteBooking(bookingId: String)
+
+    @Query("DELETE FROM bookings")
+    suspend fun clearAllBookings()
 }
 
 @Dao
@@ -147,7 +150,7 @@ interface ResponseDao {
         DbRequest::class,
         DbResponse::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AgeNoBarDatabase : RoomDatabase() {

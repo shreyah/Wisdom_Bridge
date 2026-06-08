@@ -2362,7 +2362,7 @@ fun HomeDashboardScreen(
                         
                         Spacer(modifier = Modifier.height(6.dp))
                         
-                        val upcomingBookings = bookingsList.filter { it.status == "Upcoming" }
+                        val upcomingBookings = bookingsList.filter { it.status == "Upcoming" || it.status == "Joined" }
                         if (upcomingBookings.isEmpty()) {
                             Box(
                                 modifier = Modifier
@@ -2424,7 +2424,7 @@ fun HomeDashboardScreen(
                                                 strokeWidth = strokeWidthPx
                                             )
                                         }
-                                        .clickable { viewModel.openScheduler(item.expertId) }
+                                        .clickable { viewModel.setEditingBooking(item) }
                                         .testTag("home_upcoming_session_${item.id}")
                                 ) {
                                     Row(
@@ -2443,34 +2443,64 @@ fun HomeDashboardScreen(
                                         }
                                         Spacer(modifier = Modifier.width(10.dp))
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = if (displayTopic.contains("Session")) displayTopic else "$displayTopic Refresher Session",
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = if (displayTopic.contains("Session")) displayTopic else "$displayTopic Refresher Session",
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                if (item.status == "Joined") {
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(8.dp)
+                                                            .background(Color(0xFF4CAF50), CircleShape)
+                                                    )
+                                                }
+                                            }
                                             Text(
                                                 text = item.timing,
                                                 fontSize = 11.sp,
                                                 color = Color.Gray
                                             )
                                             Text(
-                                                text = "Mentor: ${item.expertName}",
+                                                text = "Mentor: ${item.expertName} (${item.durationMinutes}m • ${if (item.isVideo) "Video" else "Voice"})",
                                                 fontSize = 11.sp,
                                                 color = Color(0xFF8B1A1A),
                                                 fontWeight = FontWeight.Bold
                                             )
                                         }
-                                        Button(
-                                            onClick = { 
-                                                viewModel.openScheduler(item.expertId)
-                                            },
-                                            shape = RoundedCornerShape(8.dp),
-                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B1A1A), contentColor = Color.White),
-                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                            modifier = Modifier.height(32.dp)
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text("Join", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            IconButton(
+                                                onClick = { viewModel.setEditingBooking(item) },
+                                                modifier = Modifier.size(32.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Edit,
+                                                    contentDescription = "Modify booking",
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                            val isJoinedState = item.status == "Joined"
+                                            Button(
+                                                onClick = { 
+                                                    viewModel.joinBooking(item.id)
+                                                },
+                                                shape = RoundedCornerShape(8.dp),
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = if (isJoinedState) Color(0xFF2E7D32) else Color(0xFF8B1A1A),
+                                                    contentColor = Color.White
+                                                ),
+                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                                modifier = Modifier.height(28.dp).testTag("home_upcoming_join_${item.id}")
+                                            ) {
+                                                Text(if (isJoinedState) "Joined ✓" else "Join", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
                                         }
                                     }
                                 }
@@ -2885,7 +2915,7 @@ fun HomeDashboardScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .shadow(elevation = 3.dp, shape = RoundedCornerShape(14.dp), clip = false)
-                                        .clickable { viewModel.openScheduler(item.expertId) }
+                                        .clickable { viewModel.setEditingBooking(item) }
                                         .testTag("home_calendar_booking_${item.id}"),
                                     colors = CardDefaults.cardColors(containerColor = Color(0xFFFAFAFA)),
                                     shape = RoundedCornerShape(14.dp)
@@ -2915,34 +2945,64 @@ fun HomeDashboardScreen(
                                         }
                                         Spacer(modifier = Modifier.width(12.dp))
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = if (displayTopic.contains("Session")) displayTopic else "$displayTopic Refresher Session",
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = if (displayTopic.contains("Session")) displayTopic else "$displayTopic Refresher Session",
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                if (item.status == "Joined") {
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(8.dp)
+                                                            .background(Color(0xFF4CAF50), CircleShape)
+                                                    )
+                                                }
+                                            }
                                             Text(
                                                 text = item.timing,
                                                 fontSize = 12.sp,
                                                 color = Color.Gray
                                             )
                                             Text(
-                                                text = "Mentor: ${item.expertName}",
+                                                text = "Mentor: ${item.expertName} (${item.durationMinutes}m • ${if (item.isVideo) "Video" else "Voice"})",
                                                 fontSize = 12.sp,
                                                 color = Color(0xFF8B1A1A),
                                                 fontWeight = FontWeight.Bold
                                             )
                                         }
-                                        Button(
-                                            onClick = { 
-                                                viewModel.openScheduler(item.expertId)
-                                            },
-                                            shape = RoundedCornerShape(10.dp),
-                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B1A1A), contentColor = Color.White),
-                                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                                            modifier = Modifier.height(36.dp)
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text("Join", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            IconButton(
+                                                onClick = { viewModel.setEditingBooking(item) },
+                                                modifier = Modifier.size(36.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Edit,
+                                                    contentDescription = "Modify booking",
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                            val isJoinedState = item.status == "Joined"
+                                            Button(
+                                                onClick = { 
+                                                    viewModel.joinBooking(item.id)
+                                                },
+                                                shape = RoundedCornerShape(10.dp),
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = if (isJoinedState) Color(0xFF2E7D32) else Color(0xFF8B1A1A),
+                                                    contentColor = Color.White
+                                                ),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                                modifier = Modifier.height(36.dp).testTag("calendar_join_${item.id}")
+                                            ) {
+                                                Text(if (isJoinedState) "Joined ✓" else "Join", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            }
                                         }
                                     }
                                 }
@@ -10282,14 +10342,14 @@ fun MessagesScreen(
                                                                     }
                                                                     OutlinedButton(
                                                                         onClick = {
-                                                                            viewModel.openScheduler(booking.expertId, booking.id)
+                                                                            viewModel.setEditingBooking(booking)
                                                                         },
                                                                         modifier = Modifier.weight(1f),
                                                                         shape = RoundedCornerShape(8.dp),
                                                                         contentPadding = PaddingValues(vertical = 4.dp, horizontal = 6.dp)
                                                                     ) {
                                                                         Text(
-                                                                            "🔄 Reschedule",
+                                                                            "✏️ Modify Class",
                                                                             fontSize = 11.sp,
                                                                             fontWeight = FontWeight.Bold
                                                                         )
@@ -14013,17 +14073,40 @@ fun CategoryDetailScreen(
                         HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
 
                         // Week strip (Mon-Sun, Saturday highlighted as dynamic today in local calendar context)
+                        val currentWeekDays = remember {
+                            val today = java.time.LocalDate.now()
+                            val monday = today.minusDays((today.dayOfWeek.value - 1).toLong())
+                            (0..6).map { offset ->
+                                val date = monday.plusDays(offset.toLong())
+                                val shortName = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US)
+                                val labelNum = date.dayOfMonth.toString()
+                                val isDateToday = date.isEqual(today)
+                                Triple(shortName, labelNum, isDateToday)
+                            }
+                        }
+                        val daysOfWeek = remember(currentWeekDays) { currentWeekDays.map { it.first } }
+                        val dayDates = remember(currentWeekDays) { currentWeekDays.map { it.second } }
+                        var selectedDayIndex by remember(currentWeekDays) {
+                            val todayIdx = currentWeekDays.indexOfFirst { it.third }
+                            mutableStateOf(if (todayIdx != -1) todayIdx else 0)
+                        }
+                        val monthYearLabel = remember(selectedDayIndex, currentWeekDays) {
+                            val today = java.time.LocalDate.now()
+                            val monday = today.minusDays((today.dayOfWeek.value - 1).toLong())
+                            val selectedDate = monday.plusDays(selectedDayIndex.toLong())
+                            val monthName = selectedDate.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.US)
+                            val yearVal = selectedDate.year
+                            "$monthName $yearVal"
+                        }
+
+                        // Week strip (Mon-Sun, dynamically generated based on current week)
                         Text(
-                            text = "Select a Day (June 2026):",
+                            text = "Select a Day ($monthYearLabel):",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.Gray,
                             modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)
                         )
-                        
-                        val daysOfWeek = remember { listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun") }
-                        val dayDates = remember { listOf("1", "2", "3", "4", "5", "6", "7") } // June 1-7, 2026
-                        var selectedDayIndex by remember { mutableStateOf(5) } // Default Saturday (June 6, 2026 is dynamic system today)
 
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -14031,7 +14114,7 @@ fun CategoryDetailScreen(
                         ) {
                             daysOfWeek.forEachIndexed { idx, day ->
                                 val dateStr = dayDates[idx]
-                                val isToday = day == "Sat" // June 6, 2026 is Saturday
+                                val isToday = currentWeekDays[idx].third
                                 val isSelected = selectedDayIndex == idx
                                 
                                 Column(
@@ -14183,19 +14266,9 @@ fun CategoryDetailScreen(
                                     val dayLabel = daysOfWeek[selectedDayIndex]
                                     val slotTiming = "$dayLabel • $selectedSlotTime"
                                     
-                                    // Local view model sync
-                                    viewModel.bookSessionWithExpert(expert.id, slotTiming)
-                                    
-                                    // Room DB Booking Write Insertion (emulates real local persistence!)
-                                    val currentUser = viewModel.currentUser.value
-                                    viewModel.bookSessionWithExpertInDb(
+                                    viewModel.bookSessionWithExpert(
                                         expertId = expert.id,
-                                        day = dayLabel,
-                                        time = selectedSlotTime!!,
-                                        slotTime = slotTiming,
-                                        learnerId = currentUser.id,
-                                        learnerName = currentUser.name,
-                                        rate = rate,
+                                        selectedTime = slotTiming,
                                         onComplete = {
                                             // Write success toast message instantly
                                             android.widget.Toast.makeText(
@@ -16480,6 +16553,588 @@ fun LearningRequestsFeedScreen(
             }
         }
     }
+}
+
+@Composable
+fun ModifyBookingDialog(
+    booking: Booking,
+    viewModel: AgeNoBarViewModel,
+    onDismiss: () -> Unit
+) {
+    var selectedTiming by remember { mutableStateOf(booking.timing) }
+    var selectedDuration by remember { mutableStateOf(booking.durationMinutes) }
+    var isVoice by remember { mutableStateOf(booking.isVoice) }
+    var isVideo by remember { mutableStateOf(booking.isVideo) }
+    
+    val availableAlternateSlots = listOf(
+        "MON • 4:00 PM - 4:30 PM",
+        "TUE • 10:00 AM - 10:30 AM",
+        "WED • 3:00 PM - 3:30 PM",
+        "THU • 2:00 PM - 2:30 PM",
+        "FRI • 11:00 AM - 11:30 AM",
+        "SAT • 4:00 PM - 4:30 PM"
+    ).filter { it != booking.timing }
+
+    var showCancelConfirm by remember { mutableStateOf(false) }
+
+    if (showCancelConfirm) {
+        AlertDialog(
+            onDismissRequest = { showCancelConfirm = false },
+            title = { Text("Cancel Appointment? 🚨", fontWeight = FontWeight.Bold, color = Color(0xFFC62828)) },
+            text = { Text("Are you absolutely sure you want to cancel your upcoming session with ${booking.expertName} on ${booking.timing}? This slot will be released back to other learners.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.cancelBooking(booking.id)
+                        showCancelConfirm = false
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828))
+                ) {
+                    Text("Yes, Cancel Session", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCancelConfirm = false }) {
+                    Text("Keep Appointment")
+                }
+            }
+        )
+    } else {
+        AlertDialog(
+            onDismissRequest = { onDismiss() },
+            title = {
+                Text("✏️ Modify Appointment", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+            },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("🤝", fontSize = 28.sp)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = booking.expertName,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "Current: ${booking.timing}",
+                                    fontSize = 12.sp,
+                                    color = Color.Gray
+                                )
+                            }
+                        }
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "Class Duration",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(15, 30, 45, 60).forEach { mins ->
+                                val selected = selectedDuration == mins
+                                Card(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { selectedDuration = mins },
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (selected) MaterialTheme.colorScheme.primary else Color(0xFFF0F0F0)
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "$mins min",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (selected) Color.White else Color.Black
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "Interaction Medium Type",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Card(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        isVideo = true
+                                        isVoice = false
+                                    },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isVideo) MaterialTheme.colorScheme.secondaryContainer else Color(0xFFF5F5F5)
+                                ),
+                                border = if (isVideo) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp).fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("🎥", fontSize = 16.sp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Video Call", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            Card(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        isVoice = true
+                                        isVideo = false
+                                    },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isVoice) MaterialTheme.colorScheme.secondaryContainer else Color(0xFFF5F5F5)
+                                ),
+                                border = if (isVoice) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp).fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("📞", fontSize = 16.sp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Voice Call", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "Reschedule Timing Slot",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        
+                        OutlinedTextField(
+                            value = selectedTiming,
+                            onValueChange = { selectedTiming = it },
+                            label = { Text("Timing Slot String") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Or quickly swap with expert alternate availability:",
+                            fontSize = 11.sp,
+                            color = Color.Gray,
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            availableAlternateSlots.forEach { slot ->
+                                Card(
+                                    modifier = Modifier
+                                        .padding(vertical = 4.dp)
+                                        .clickable { selectedTiming = slot },
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (selectedTiming == slot) MaterialTheme.colorScheme.tertiaryContainer else Color(0xFFE9ECEF)
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text(
+                                        text = slot,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+                        
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.openScheduler(booking.expertId, booking.id)
+                                onDismiss()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text("📅 Open Visual Scheduler Calendar", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.updateBookingDetails(
+                            bookingId = booking.id,
+                            newTiming = selectedTiming,
+                            newDuration = selectedDuration,
+                            isVoice = isVoice,
+                            isVideo = isVideo
+                        )
+                        onDismiss()
+                    },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Save Changes", fontWeight = FontWeight.ExtraBold)
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        onClick = { showCancelConfirm = true },
+                        colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFC62828))
+                    ) {
+                        Text("🗑️ Cancel Session", fontWeight = FontWeight.Bold)
+                    }
+                    TextButton(onClick = { onDismiss() }) {
+                        Text("Close", fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun LiveClassroomDialog(
+    booking: Booking,
+    viewModel: AgeNoBarViewModel,
+    onDismiss: () -> Unit
+) {
+    var isMuted by remember { mutableStateOf(false) }
+    var isCameraOff by remember { mutableStateOf(false) }
+    var isSpeakerOn by remember { mutableStateOf(true) }
+    
+    // Simulate elapsed minutes tracker
+    var elapsedSeconds by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000)
+            elapsedSeconds += 1
+        }
+    }
+    
+    val minutes = elapsedSeconds / 60
+    val seconds = elapsedSeconds % 60
+    val timeString = String.format("%02d:%02d", minutes, seconds)
+    
+    AlertDialog(
+        onDismissRequest = { onDismiss() },
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false
+        ),
+        modifier = Modifier
+            .fillMaxWidth(0.92f)
+            .padding(vertical = 12.dp)
+            .testTag("live_classroom_dialog"),
+        shape = RoundedCornerShape(24.dp),
+        tonalElevation = 6.dp,
+        title = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Wisdom Bridge Classroom 🚀",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF8B1A1A)
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .background(Color(0xFF4CAF50), CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "LIVE CONNECTED",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF4CAF50)
+                            )
+                        }
+                    }
+                    IconButton(onClick = { onDismiss() }) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close screen")
+                    }
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Active Class Workspace Simulation
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(240.dp)
+                        .background(Color(0xFF1E1E1E), RoundedCornerShape(18.dp))
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (booking.isVideo && !isCameraOff) {
+                         Column(
+                             modifier = Modifier.fillMaxSize(),
+                             horizontalAlignment = Alignment.CenterHorizontally,
+                             verticalArrangement = Arrangement.SpaceBetween
+                         ) {
+                             Box(
+                                 modifier = Modifier
+                                     .weight(1f)
+                                     .fillMaxWidth(),
+                                 contentAlignment = Alignment.Center
+                             ) {
+                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                     AvatarImage(
+                                         name = booking.expertName,
+                                         size = 90,
+                                         isSpeaking = true,
+                                         wavePower = 0.7f
+                                     )
+                                     Spacer(modifier = Modifier.height(6.dp))
+                                     Text(
+                                         text = booking.expertName,
+                                         color = Color.White,
+                                         fontSize = 14.sp,
+                                         fontWeight = FontWeight.Bold
+                                     )
+                                     Text(
+                                         text = "Teaching Refresher Session",
+                                         color = Color.LightGray,
+                                         fontSize = 10.sp
+                                     )
+                                 }
+                             }
+                             
+                             Row(
+                                 modifier = Modifier.fillMaxWidth(),
+                                 horizontalArrangement = Arrangement.End
+                             ) {
+                                 Box(
+                                     modifier = Modifier
+                                         .size(70.dp, 80.dp)
+                                         .background(Color(0xFF333333), RoundedCornerShape(10.dp))
+                                         .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(10.dp)),
+                                     contentAlignment = Alignment.Center
+                                 ) {
+                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                         Text("🙋‍♂️", fontSize = 20.sp)
+                                         Spacer(modifier = Modifier.height(2.dp))
+                                         Text("You", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                     }
+                                 }
+                             }
+                         }
+                    } else {
+                         Column(
+                             horizontalAlignment = Alignment.CenterHorizontally,
+                             verticalArrangement = Arrangement.Center
+                         ) {
+                             AvatarImage(
+                                 name = booking.expertName,
+                                 size = 100,
+                                 isSpeaking = true,
+                                 wavePower = 0.5f
+                             )
+                             Spacer(modifier = Modifier.height(10.dp))
+                             Text(
+                                 text = booking.expertName,
+                                 color = Color.White,
+                                 fontSize = 15.sp,
+                                 fontWeight = FontWeight.Bold
+                             )
+                             Text(
+                                 text = if (isMuted) "You are muted" else "Active Voice Session",
+                                 color = if (isMuted) Color.Red else Color(0xFF4CAF50),
+                                 fontSize = 11.sp,
+                                 fontWeight = FontWeight.Bold
+                             )
+                             
+                             Spacer(modifier = Modifier.height(10.dp))
+                             Row(
+                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                 verticalAlignment = Alignment.CenterVertically
+                             ) {
+                                 repeat(6) {
+                                     Box(
+                                         modifier = Modifier
+                                             .size(4.dp, 20.dp)
+                                             .background(
+                                                 if (isMuted) Color.Gray else Color(0xFF8B1A1A), 
+                                                 RoundedCornerShape(2.dp)
+                                             )
+                                     )
+                                 }
+                             }
+                         }
+                    }
+                    
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(6.dp),
+                        contentAlignment = Alignment.TopStart
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color.Black.copy(alpha = 0.6f),
+                            contentColor = Color.White
+                        ) {
+                            Text(
+                                text = "⏱️ $timeString",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FilledIconButton(
+                        onClick = { isMuted = !isMuted },
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = if (isMuted) Color(0xFFE53935) else Color(0xFFEEEEEE),
+                            contentColor = if (isMuted) Color.White else Color.Black
+                        ),
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Text(if (isMuted) "🔇" else "🎙️", fontSize = 16.sp)
+                    }
+                    
+                    if (booking.isVideo) {
+                        FilledIconButton(
+                            onClick = { isCameraOff = !isCameraOff },
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = if (isCameraOff) Color(0xFFE53935) else Color(0xFFEEEEEE),
+                                contentColor = if (isCameraOff) Color.White else Color.Black
+                            ),
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Text(if (isCameraOff) "❌🎥" else "📹", fontSize = 14.sp)
+                        }
+                    }
+                    
+                    FilledIconButton(
+                        onClick = { isSpeakerOn = !isSpeakerOn },
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = if (isSpeakerOn) Color(0xFFE2F0D9) else Color(0xFFEEEEEE),
+                            contentColor = Color.Black
+                        ),
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Text(if (isSpeakerOn) "🔊" else "🔇", fontSize = 16.sp)
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(14.dp))
+                
+                Divider(color = Color.LightGray.copy(alpha = 0.5f))
+                
+                Spacer(modifier = Modifier.height(10.dp))
+                
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            onDismiss()
+                            viewModel.setEditingBooking(booking)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(imageVector = Icons.Default.Edit, contentDescription = "Reschedule")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Modify / Reschedule Booking ✏️",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onDismiss() },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFC62828),
+                    contentColor = Color.White
+                ),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text(
+                    text = "Leave Class 📞",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+        },
+        dismissButton = {}
+    )
 }
 
 

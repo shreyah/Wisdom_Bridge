@@ -34,6 +34,24 @@ class MainActivity : ComponentActivity() {
                 val isRoomMinimized by viewModel.isVoiceRoomMinimized.collectAsState()
                 val selectedSchedulerExpertId by viewModel.selectedSchedulerExpertId.collectAsState()
                 val selectedRescheduleBookingId by viewModel.selectedRescheduleBookingId.collectAsState()
+                val editingBooking by viewModel.editingBooking.collectAsState()
+                val activeClassroomBooking by viewModel.activeClassroomBooking.collectAsState()
+
+                if (editingBooking != null) {
+                    ModifyBookingDialog(
+                        booking = editingBooking!!,
+                        viewModel = viewModel,
+                        onDismiss = { viewModel.setEditingBooking(null) }
+                    )
+                }
+
+                if (activeClassroomBooking != null) {
+                    LiveClassroomDialog(
+                        booking = activeClassroomBooking!!,
+                        viewModel = viewModel,
+                        onDismiss = { viewModel.setActiveClassroomBooking(null) }
+                    )
+                }
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),

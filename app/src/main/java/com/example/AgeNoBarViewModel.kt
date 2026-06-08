@@ -1136,10 +1136,10 @@ class AgeNoBarViewModel : ViewModel() {
 
         // Custom triggers for visual scheduling assistant
         if (q.contains("lakshmi") || q.contains("math")) {
-            matchedExperts.add("exp_mock_lakshmi_rao")
+            matchedExperts.add("exp_seed_maths_1")
         }
         if (q.contains("garden") || q.contains("dutta") || q.contains("reschedule")) {
-            matchedExperts.add("exp_mock_sc_dutta")
+            matchedExperts.add("exp_seed_gardening_0")
         }
         if (q.contains("sessions") || q.contains("appointment") || q.contains("schedule") || q.contains("my schedule")) {
             matchedBookings.add("b_default_1")
@@ -2439,7 +2439,7 @@ class AgeNoBarViewModel : ViewModel() {
         }
     }
 
-    fun rescheduleBooking(bookingId: String, newTiming: String) {
+    fun rescheduleBooking(bookingId: String, newTiming: String, onComplete: (() -> Unit)? = null) {
         val currentBookings = _bookingsList.value
         val bookingIndex = currentBookings.indexOfFirst { it.id == bookingId }
         val expertId = if (bookingIndex != -1) currentBookings[bookingIndex].expertId else ""
@@ -2501,6 +2501,7 @@ class AgeNoBarViewModel : ViewModel() {
                 withContext(Dispatchers.Main) {
                     _bookedSessionExpertIds.update { it + (expertId to newTiming) }
                     saveBookings()
+                    onComplete?.invoke()
                 }
                 
                 // Write notification chat to thread

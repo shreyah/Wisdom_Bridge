@@ -1570,6 +1570,171 @@ data class CalendarDay(
     val dateString: String = ""
 )
 
+data class BookingConfirmationData(
+    val expertName: String,
+    val title: String,
+    val timing: String,
+    val category: String,
+    val emoji: String,
+    val isReschedule: Boolean = false
+)
+
+fun formatTimingWithDate(timing: String): String {
+    val today = try {
+        java.time.LocalDate.now()
+    } catch (e: Exception) {
+        java.time.LocalDate.of(2026, 6, 8)
+    }
+    val currentMonday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+    
+    val daysOfWeek = listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+    val fullDaysOfWeek = listOf("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY")
+    
+    val upper = timing.uppercase()
+    
+    for (i in 0..6) {
+        val targetDay = currentMonday.plusDays(i.toLong())
+        val shortName = daysOfWeek[i]
+        val fullName = fullDaysOfWeek[i]
+        
+        val monthStr = targetDay.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US)
+        val dayOfMonthString = "${monthStr} ${targetDay.dayOfMonth}"
+        
+        if (upper.contains(fullName)) {
+            val formattedFullName = fullName.lowercase().replaceFirstChar { it.uppercase() }
+            val regex = Regex("(?i)\\b${fullName}\\b")
+            if (regex.containsMatchIn(timing)) {
+                return regex.replace(timing, "$formattedFullName, $dayOfMonthString")
+            }
+        }
+        
+        if (upper.contains(shortName)) {
+            val formattedShortName = shortName.uppercase()
+            val regex = Regex("(?i)\\b${shortName}\\b")
+            if (regex.containsMatchIn(timing)) {
+                return regex.replace(timing, "$formattedShortName, $dayOfMonthString")
+            }
+        }
+    }
+    
+    if (upper.contains("YESTERDAY")) {
+        val yesterdayDate = today.minusDays(1)
+        val monthStr = yesterdayDate.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US)
+        return timing.replace("Yesterday", "Yesterday, ${monthStr} ${yesterdayDate.dayOfMonth}")
+    }
+    
+    return timing
+}
+
+@Composable
+fun WisdomBridgeHorizontalCalendar(
+    selectedDayKey: String,
+    daysList: List<CalendarDay>,
+    bookingsList: List<Booking>,
+    onDaySelected: (CalendarDay) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val calendarListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val todayIndex = remember(daysList) { daysList.indexOfFirst { it.isToday } }
+    LaunchedEffect(todayIndex) {
+        if (todayIndex != -1) {
+            calendarListState.scrollToItem(maxOf(0, todayIndex - 2))
+        }
+    }
+
+    androidx.compose.foundation.lazy.LazyRow(
+        state = calendarListState,
+        modifier = modifier
+            .fillMaxWidth()
+            .background(Color.White.copy(alpha = 0.6f), RoundedCornerShape(26.dp))
+            .border(BorderStroke(1.dp, Color.White), RoundedCornerShape(26.dp))
+            .padding(vertical = 8.dp, horizontal = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        items(daysList) { day ->
+            val isSelected = selectedDayKey.uppercase() == day.key.uppercase()
+            val hasBooking = bookingsList.any { b ->
+                val bTiming = b.timing.lowercase()
+                val dayKey = day.key.lowercase()
+                val dayNameFull = day.fullName.lowercase()
+                bTiming.contains(dayKey) || bTiming.contains(dayNameFull) ||
+                (day.isToday && bTiming.contains("today")) ||
+                (bTiming.contains("tomorrow") && daysList.indexOf(day) == (daysList.indexOfFirst { it.isToday } + 1) % daysList.size)
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .width(55.dp)
+                    .padding(horizontal = 2.dp)
+                    .shadow(
+                        elevation = if (isSelected) 3.dp else 0.dp,
+                        shape = RoundedCornerShape(20.dp)
+                    )
+                    .background(
+                        brush = if (isSelected) Brush.linearGradient(
+                            colors = listOf(Color(0xFFF8E7EE), Color(0xFFEADCF8))
+                        ) else if (day.isToday) Brush.linearGradient(
+                            colors = listOf(Color.White.copy(alpha = 0.9f), Color.White.copy(alpha = 0.8f))
+                        ) else Brush.linearGradient(
+                            colors = listOf(Color.Transparent, Color.Transparent)
+                        ),
+                        shape = RoundedCornerShape(20.dp)
+                    )
+                    .border(
+                        width = if (day.isToday && !isSelected) 1.dp else 0.dp,
+                        color = if (day.isToday && !isSelected) Color(0xFFEADCF8) else Color.Transparent,
+                        shape = RoundedCornerShape(20.dp)
+                    )
+                    .clickable { onDaySelected(day) }
+                    .padding(vertical = 8.dp)
+                    .testTag("calendar_day_${day.key.uppercase()}")
+            ) {
+                Text(
+                    text = day.key.uppercase(),
+                    fontSize = 11.sp,
+                    fontWeight = if (isSelected || day.isToday) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isSelected) Color(0xFF2C2625) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+                
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .background(
+                            color = if (isSelected) Color.White.copy(alpha = 0.5f)
+                                    else Color.Transparent,
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = day.labelNum,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isSelected) Color(0xFF2C2625)
+                                else if (day.isToday) Color(0xFF705DA3)
+                                else MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .background(
+                            color = if (hasBooking) Color(0xFF8B1A1A) else Color.Gray.copy(alpha = 0.25f),
+                            shape = CircleShape
+                        )
+                )
+            }
+        }
+    }
+}
+
 fun Modifier.whiteCardShadow(): Modifier = this.drawBehind {
     val cornerRadiusPx = 20.dp.toPx()
     val width = size.width
@@ -2221,9 +2386,7 @@ fun HomeDashboardScreen(
                                 .height(112.dp)
                                 .sessionsHaloWrapper()
                                 .clickable {
-                                    homeCoroutineScope.launch {
-                                        homeLazyListState.animateScrollToItem(3)
-                                    }
+                                    viewModel.selectTab(AppTab.SearchRecommend)
                                 }
                                 .testTag("notice_find_expert_trigger")
                         ) {
@@ -2355,7 +2518,7 @@ fun HomeDashboardScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF8B1A1A),
                                 modifier = Modifier.clickable {
-                                    viewModel.openScheduler("exp_mock_lakshmi_rao")
+                                    viewModel.openScheduler("exp_seed_maths_1")
                                 }
                             )
                         }
@@ -2405,15 +2568,15 @@ fun HomeDashboardScreen(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(bottom = 6.dp)
+                                        .padding(bottom = 4.dp)
                                         .shadow(
-                                            elevation = 2.dp,
-                                            shape = RoundedCornerShape(12.dp),
+                                            elevation = 1.dp,
+                                            shape = RoundedCornerShape(10.dp),
                                             clip = false
                                         )
                                         .background(
                                             color = Color(0xFFFAFAFA),
-                                            shape = RoundedCornerShape(12.dp)
+                                            shape = RoundedCornerShape(10.dp)
                                         )
                                         .drawBehind {
                                             val strokeWidthPx = 3.dp.toPx()
@@ -2430,43 +2593,43 @@ fun HomeDashboardScreen(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(10.dp),
+                                            .padding(horizontal = 8.dp, vertical = 6.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Box(
                                             modifier = Modifier
-                                                .size(36.dp)
+                                                .size(28.dp)
                                                 .background(borderColor.copy(alpha = 0.2f), CircleShape),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text(emoji, fontSize = 18.sp)
+                                            Text(emoji, fontSize = 14.sp)
                                         }
-                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
                                         Column(modifier = Modifier.weight(1f)) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Text(
                                                     text = if (displayTopic.contains("Session")) displayTopic else "$displayTopic Refresher Session",
-                                                    fontSize = 13.sp,
+                                                    fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = MaterialTheme.colorScheme.onSurface
                                                 )
                                                 if (item.status == "Joined") {
-                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Spacer(modifier = Modifier.width(4.dp))
                                                     Box(
                                                         modifier = Modifier
-                                                            .size(8.dp)
+                                                            .size(6.dp)
                                                             .background(Color(0xFF4CAF50), CircleShape)
                                                     )
                                                 }
                                             }
                                             Text(
-                                                text = item.timing,
-                                                fontSize = 11.sp,
+                                                text = formatTimingWithDate(item.timing),
+                                                fontSize = 10.sp,
                                                 color = Color.Gray
                                             )
                                             Text(
                                                 text = "Mentor: ${item.expertName} (${item.durationMinutes}m • ${if (item.isVideo) "Video" else "Voice"})",
-                                                fontSize = 11.sp,
+                                                fontSize = 10.sp,
                                                 color = Color(0xFF8B1A1A),
                                                 fontWeight = FontWeight.Bold
                                             )
@@ -2475,31 +2638,33 @@ fun HomeDashboardScreen(
                                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            IconButton(
+                                            OutlinedButton(
                                                 onClick = { viewModel.setEditingBooking(item) },
-                                                modifier = Modifier.size(32.dp)
+                                                shape = RoundedCornerShape(6.dp),
+                                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                                                colors = ButtonDefaults.outlinedButtonColors(
+                                                    contentColor = MaterialTheme.colorScheme.primary
+                                                ),
+                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                modifier = Modifier.height(24.dp).testTag("home_upcoming_modify_${item.id}")
                                             ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Edit,
-                                                    contentDescription = "Modify booking",
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(16.dp)
-                                                )
+                                                Text("Modify", fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                             }
+
                                             val isJoinedState = item.status == "Joined"
                                             Button(
                                                 onClick = { 
                                                     viewModel.joinBooking(item.id)
                                                 },
-                                                shape = RoundedCornerShape(8.dp),
+                                                shape = RoundedCornerShape(6.dp),
                                                 colors = ButtonDefaults.buttonColors(
                                                     containerColor = if (isJoinedState) Color(0xFF2E7D32) else Color(0xFF8B1A1A),
                                                     contentColor = Color.White
                                                 ),
-                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                                modifier = Modifier.height(28.dp).testTag("home_upcoming_join_${item.id}")
+                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                modifier = Modifier.height(24.dp).testTag("home_upcoming_join_${item.id}")
                                             ) {
-                                                Text(if (isJoinedState) "Joined ✓" else "Join", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                Text(if (isJoinedState) "Joined ✓" else "Join Class", fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                             }
                                         }
                                     }
@@ -2761,105 +2926,13 @@ fun HomeDashboardScreen(
                     
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    val calendarListState = rememberLazyListState()
-                    val todayIndex = remember(calendarDays) { calendarDays.indexOfFirst { it.isToday } }
-                    LaunchedEffect(todayIndex) {
-                        if (todayIndex != -1) {
-                            calendarListState.scrollToItem(maxOf(0, todayIndex - 2))
-                        }
-                    }
-
-                    LazyRow(
-                        state = calendarListState,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color.White.copy(alpha = 0.6f), RoundedCornerShape(26.dp))
-                            .border(BorderStroke(1.dp, Color.White), RoundedCornerShape(26.dp))
-                            .padding(vertical = 8.dp, horizontal = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        items(calendarDays) { day ->
-                            val isSelected = selectedCalendarDay == day.dateString
-                            val hasBooking = bookingsList.any { b ->
-                                val bTiming = b.timing.lowercase()
-                                val dayKey = day.key.lowercase()
-                                val dayNameFull = day.fullName.lowercase()
-                                bTiming.contains(dayKey) || bTiming.contains(dayNameFull) ||
-                                (day.isToday && bTiming.contains("today")) ||
-                                (bTiming.contains("tomorrow") && calendarDays.indexOf(day) == (calendarDays.indexOfFirst { it.isToday } + 1) % calendarDays.size)
-                            }
-
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier
-                                    .width(55.dp)
-                                    .padding(horizontal = 2.dp)
-                                    .shadow(
-                                        elevation = if (isSelected) 3.dp else 0.dp,
-                                        shape = RoundedCornerShape(20.dp)
-                                    )
-                                    .background(
-                                        brush = if (isSelected) Brush.linearGradient(
-                                            colors = listOf(Color(0xFFF8E7EE), Color(0xFFEADCF8)) // Blush Pink to Soft Lavender
-                                        ) else if (day.isToday) Brush.linearGradient(
-                                            colors = listOf(Color.White.copy(alpha = 0.9f), Color.White.copy(alpha = 0.8f))
-                                        ) else Brush.linearGradient(
-                                            colors = listOf(Color.Transparent, Color.Transparent)
-                                        ),
-                                        shape = RoundedCornerShape(20.dp)
-                                    )
-                                    .border(
-                                        width = if (day.isToday && !isSelected) 1.dp else 0.dp,
-                                        color = if (day.isToday && !isSelected) Color(0xFFEADCF8) else Color.Transparent,
-                                        shape = RoundedCornerShape(20.dp)
-                                    )
-                                    .clickable { selectedCalendarDay = day.dateString }
-                                    .padding(vertical = 8.dp)
-                            ) {
-                                Text(
-                                    text = day.key,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isSelected || day.isToday) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (isSelected) Color(0xFF2C2625) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                )
-                                
-                                Spacer(modifier = Modifier.height(6.dp))
-
-                                Box(
-                                    modifier = Modifier
-                                        .size(28.dp)
-                                        .background(
-                                            color = if (isSelected) Color.White.copy(alpha = 0.5f)
-                                                    else Color.Transparent,
-                                            shape = CircleShape
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = day.labelNum,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isSelected) Color(0xFF2C2625)
-                                                else if (day.isToday) Color(0xFF705DA3)
-                                                else MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(4.dp))
-
-                                // Event indicator dot (filled for bookings, lighter/empty for no bookings)
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .background(
-                                            color = if (hasBooking) Color(0xFF8B1A1A) else Color.Gray.copy(alpha = 0.25f),
-                                            shape = CircleShape
-                                        )
-                                )
-                            }
-                        }
-                    }
+                    val homeSelectedDayObject = calendarDays.find { it.dateString == selectedCalendarDay } ?: calendarDays[0]
+                    WisdomBridgeHorizontalCalendar(
+                        selectedDayKey = homeSelectedDayObject.key,
+                        daysList = calendarDays,
+                        bookingsList = bookingsList,
+                        onDaySelected = { selectedCalendarDay = it.dateString }
+                    )
 
                     Spacer(modifier = Modifier.height(12.dp))
 
@@ -2962,7 +3035,7 @@ fun HomeDashboardScreen(
                                                 }
                                             }
                                             Text(
-                                                text = item.timing,
+                                                text = formatTimingWithDate(item.timing),
                                                 fontSize = 12.sp,
                                                 color = Color.Gray
                                             )
@@ -2974,20 +3047,23 @@ fun HomeDashboardScreen(
                                             )
                                         }
                                         Row(
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            IconButton(
+                                            // Labeled "Modify" button instead of the pencil icon
+                                            OutlinedButton(
                                                 onClick = { viewModel.setEditingBooking(item) },
-                                                modifier = Modifier.size(36.dp)
+                                                shape = RoundedCornerShape(10.dp),
+                                                border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.primary),
+                                                colors = ButtonDefaults.outlinedButtonColors(
+                                                    contentColor = MaterialTheme.colorScheme.primary
+                                                ),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                                modifier = Modifier.height(36.dp).testTag("calendar_modify_${item.id}")
                                             ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Edit,
-                                                    contentDescription = "Modify booking",
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
+                                                Text("Modify", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                             }
+
                                             val isJoinedState = item.status == "Joined"
                                             Button(
                                                 onClick = { 
@@ -3001,7 +3077,7 @@ fun HomeDashboardScreen(
                                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                                 modifier = Modifier.height(36.dp).testTag("calendar_join_${item.id}")
                                             ) {
-                                                Text(if (isJoinedState) "Joined ✓" else "Join", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                                Text(if (isJoinedState) "Joined ✓" else "Join Class", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                             }
                                         }
                                     }
@@ -14072,8 +14148,8 @@ fun CategoryDetailScreen(
 
                         HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
 
-                        // Week strip (Mon-Sun, Saturday highlighted as dynamic today in local calendar context)
-                        val currentWeekDays = remember {
+                        // Pastel glassmorphism calendar strip replacing the old red-outline week strip in booking sheet
+                        val calendarDays = remember {
                             val today = java.time.LocalDate.now()
                             val monday = today.minusDays((today.dayOfWeek.value - 1).toLong())
                             (0..6).map { offset ->
@@ -14081,16 +14157,21 @@ fun CategoryDetailScreen(
                                 val shortName = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US)
                                 val labelNum = date.dayOfMonth.toString()
                                 val isDateToday = date.isEqual(today)
-                                Triple(shortName, labelNum, isDateToday)
+                                CalendarDay(
+                                    key = shortName.take(3).uppercase(),
+                                    fullName = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.US),
+                                    labelNum = labelNum,
+                                    isToday = isDateToday,
+                                    dateString = date.toString()
+                                )
                             }
                         }
-                        val daysOfWeek = remember(currentWeekDays) { currentWeekDays.map { it.first } }
-                        val dayDates = remember(currentWeekDays) { currentWeekDays.map { it.second } }
-                        var selectedDayIndex by remember(currentWeekDays) {
-                            val todayIdx = currentWeekDays.indexOfFirst { it.third }
+                        val daysOfWeek = remember(calendarDays) { calendarDays.map { it.key } }
+                        var selectedDayIndex by remember(calendarDays) {
+                            val todayIdx = calendarDays.indexOfFirst { it.isToday }
                             mutableStateOf(if (todayIdx != -1) todayIdx else 0)
                         }
-                        val monthYearLabel = remember(selectedDayIndex, currentWeekDays) {
+                        val monthYearLabel = remember(selectedDayIndex, calendarDays) {
                             val today = java.time.LocalDate.now()
                             val monday = today.minusDays((today.dayOfWeek.value - 1).toLong())
                             val selectedDate = monday.plusDays(selectedDayIndex.toLong())
@@ -14108,67 +14189,19 @@ fun CategoryDetailScreen(
                             modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)
                         )
 
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            daysOfWeek.forEachIndexed { idx, day ->
-                                val dateStr = dayDates[idx]
-                                val isToday = currentWeekDays[idx].third
-                                val isSelected = selectedDayIndex == idx
-                                
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .background(
-                                            if (isSelected) Color(0xFFC0392B).copy(alpha = 0.08f) else Color.Transparent,
-                                            RoundedCornerShape(12.dp)
-                                        )
-                                        .border(
-                                            border = BorderStroke(
-                                                width = if (isSelected) 2.dp else if (isToday) 2.dp else 1.dp,
-                                                color = if (isSelected) Color(0xFFC0392B) 
-                                                       else if (isToday) Color(0xFFC0392B).copy(alpha = 0.5f) 
-                                                       else Color.LightGray.copy(alpha = 0.6f)
-                                            ),
-                                            shape = RoundedCornerShape(12.dp)
-                                        )
-                                        .clickable { selectedDayIndex = idx }
-                                        .padding(vertical = 10.dp)
-                                        .testTag("week_strip_day_$idx")
-                                ) {
-                                    Text(
-                                        text = day,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isSelected) Color(0xFFC0392B) else Color.DarkGray
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = dateStr,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = if (isSelected) Color(0xFFC0392B) else Color.Black
-                                    )
-                                    if (isToday) {
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Box(
-                                            modifier = Modifier
-                                                .background(Color(0xFFC0392B), RoundedCornerShape(4.dp))
-                                                .padding(horizontal = 4.dp, vertical = 2.dp)
-                                        ) {
-                                            Text(
-                                                text = "TODAY",
-                                                fontSize = 7.sp,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                color = Color.White
-                                            )
-                                        }
-                                    }
+                        val bookingsList by viewModel.bookingsList.collectAsState()
+                        WisdomBridgeHorizontalCalendar(
+                            selectedDayKey = daysOfWeek[selectedDayIndex],
+                            daysList = calendarDays,
+                            bookingsList = bookingsList,
+                            onDaySelected = { day ->
+                                val idx = daysOfWeek.indexOfFirst { it.uppercase() == day.key.uppercase() }
+                                if (idx != -1) {
+                                    selectedDayIndex = idx
                                 }
-                            }
-                        }
+                            },
+                            modifier = Modifier.fillMaxWidth().testTag("booking_sheet_calendar")
+                        )
 
                         Spacer(modifier = Modifier.height(14.dp))
 
@@ -15513,12 +15546,20 @@ fun PremiumBookingCalendarScreen(
     // Apple Health style Day selection dataset dynamically computed
     val today = java.time.LocalDate.now()
     val currentMonday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
-    val weekDays = remember {
+    val calendarDays = remember {
         (0..6).map { i ->
             val date = currentMonday.plusDays(i.toLong())
-            val shortName = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()).uppercase() // "MON", "TUE"...
+            val isDateToday = date.isEqual(today)
+            val shortName = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()) // "Mon", "Tue"
+            val fullName = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault())
             val labelNum = date.dayOfMonth.toString()
-            Pair(shortName.take(3), labelNum)
+            CalendarDay(
+                key = shortName.take(3),
+                fullName = fullName,
+                labelNum = labelNum,
+                isToday = isDateToday,
+                dateString = date.toString()
+            )
         }
     }
     
@@ -15550,6 +15591,7 @@ fun PremiumBookingCalendarScreen(
     var alertMessage by remember { mutableStateOf<String?>(null) }
     var showBookingConfirmationBySlot by remember { mutableStateOf<String?>(null) }
     var blockedSlots by remember { mutableStateOf(setOf<String>()) } // Format: "WED • 10:00 AM - 10:30 AM"
+    var bookingSuccessData by remember { mutableStateOf<BookingConfirmationData?>(null) }
 
     Box(
         modifier = Modifier
@@ -15701,61 +15743,14 @@ fun PremiumBookingCalendarScreen(
                             )
                         }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            weekDays.forEach { dayPair ->
-                                val (dayLabel, dateNum) = dayPair
-                                val isSelected = selectedDay == dayLabel
-                                
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .padding(horizontal = 3.dp)
-                                        .height(68.dp)
-                                        .shadow(
-                                            elevation = if (isSelected) 4.dp else 0.dp,
-                                            shape = RoundedCornerShape(24.dp)
-                                        )
-                                        .background(
-                                            brush = if (isSelected) Brush.linearGradient(
-                                                colors = listOf(Color(0xFFF8E7EE), Color(0xFFEADCF8)) // Blush Pink to Soft Lavender
-                                            ) else Brush.linearGradient(
-                                                colors = listOf(Color.White.copy(alpha = 0.5f), Color.White.copy(alpha = 0.3f))
-                                            ),
-                                            shape = RoundedCornerShape(24.dp)
-                                        )
-                                        .border(
-                                            width = 1.dp,
-                                            color = if (isSelected) Color.White.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.15f),
-                                            shape = RoundedCornerShape(24.dp)
-                                        )
-                                        .clickable { selectedDay = dayLabel }
-                                        .testTag("week_day_$dayLabel"),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        Text(
-                                            text = dayLabel,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isSelected) Color(0xFF2C2625) else Color.Gray
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = dateNum,
-                                            fontSize = 17.sp,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = if (isSelected) Color(0xFF2C2625) else Color.Black
-                                        )
-                                    }
-                                }
+                        WisdomBridgeHorizontalCalendar(
+                            selectedDayKey = selectedDay,
+                            daysList = calendarDays,
+                            bookingsList = bookingsList,
+                            onDaySelected = { day ->
+                                selectedDay = day.key.uppercase()
                             }
-                        }
+                        )
                     }
                 }
 
@@ -16062,8 +16057,22 @@ fun PremiumBookingCalendarScreen(
                                                 Button(
                                                     onClick = {
                                                         if (rescheduleBookingId != null) {
-                                                            viewModel.rescheduleBooking(rescheduleBookingId, timingString)
-                                                            alertMessage = "Your session was successfully rescheduled to $timingString!"
+                                                            viewModel.rescheduleBooking(rescheduleBookingId, timingString, onComplete = {
+                                                                bookingSuccessData = BookingConfirmationData(
+                                                                    expertName = expert?.name ?: "Mentor",
+                                                                    title = expert?.title ?: "Expert Guide",
+                                                                    timing = timingString,
+                                                                    category = expert?.category ?: "LEARN & GROW",
+                                                                    emoji = when (expert?.category?.uppercase()) {
+                                                                        "LEARN & GROW" -> "📚"
+                                                                        "HEALTH & WELLNESS" -> "🌿"
+                                                                        "ARTS, MUSIC & CULTURE" -> "🎨"
+                                                                        "NATURE & LIFESTYLE" -> "🌱"
+                                                                        else -> "📚"
+                                                                    },
+                                                                    isReschedule = true
+                                                                )
+                                                            })
                                                         } else {
                                                             showBookingConfirmationBySlot = timingString
                                                         }
@@ -16125,9 +16134,23 @@ fun PremiumBookingCalendarScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.bookSessionWithExpert(expertId, timing, isVideo = true)
+                        viewModel.bookSessionWithExpert(expertId, timing, isVideo = true, onComplete = {
+                            bookingSuccessData = BookingConfirmationData(
+                                expertName = expert?.name ?: "Mentor",
+                                title = expert?.title ?: "Expert Guide",
+                                timing = timing,
+                                category = expert?.category ?: "LEARN & GROW",
+                                emoji = when (expert?.category?.uppercase()) {
+                                    "LEARN & GROW" -> "📚"
+                                    "HEALTH & WELLNESS" -> "🌿"
+                                    "ARTS, MUSIC & CULTURE" -> "🎨"
+                                    "NATURE & LIFESTYLE" -> "🌱"
+                                    else -> "📚"
+                                },
+                                isReschedule = false
+                            )
+                        })
                         showBookingConfirmationBySlot = null
-                        alertMessage = "Success! Your live lesson is booked for $timing."
                     }
                 ) {
                     Text("Confirm Booking & Close", fontWeight = FontWeight.Bold)
@@ -16139,6 +16162,155 @@ fun PremiumBookingCalendarScreen(
                 }
             }
         )
+    }
+
+    if (bookingSuccessData != null) {
+        val successData = bookingSuccessData!!
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFFF7F5F9))
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .whiteCardShadow()
+                    .background(Color.White, RoundedCornerShape(26.dp))
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .background(Color(0xFFE8F8F5), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("✅", fontSize = 36.sp)
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                Text(
+                    text = if (successData.isReschedule) "Session Rescheduled Successfully" else "Session Booked Successfully",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF2E7D32)
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFFBF8FC), RoundedCornerShape(18.dp))
+                        .border(1.dp, Color(0xFFEADCF8).copy(alpha = 0.5f), RoundedCornerShape(18.dp))
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Instructor: ${successData.expertName}",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.Black
+                    )
+                    Text(
+                        text = successData.title,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = successData.timing,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color(0xFF8B1A1A)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xFFF5EEF8), RoundedCornerShape(12.dp))
+                            .border(1.dp, Color(0xFFE8DAEF), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "${successData.emoji} ${successData.category}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF7D3C98)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(26.dp))
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            bookingSuccessData = null
+                            onBack()
+                        },
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B1A1A)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("alert_success_view_calendar")
+                    ) {
+                        Text("View In Calendar", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+
+                    Button(
+                        onClick = {
+                            bookingSuccessData = null
+                            viewModel.closeScheduler()
+                            val dayAndMonth = successData.timing.substringBefore(" • ").trim()
+                            val timePart = successData.timing.substringAfter(" • ").trim().substringBefore(" - ").trim()
+                            
+                            val starterMsg = if (successData.isReschedule) {
+                                "Hello ${successData.expertName}, I have rescheduled our session to $dayAndMonth at $timePart. Looking forward to meeting you."
+                            } else {
+                                "Hello ${successData.expertName}, I have booked a session with you on $dayAndMonth at $timePart. Looking forward to meeting you."
+                            }
+                            viewModel.startDirectChat(expertId, starterMsg)
+                        },
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A4A4A)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("alert_success_message_teacher")
+                    ) {
+                        Text("Message Teacher", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            bookingSuccessData = null
+                            onBack()
+                        },
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.2.dp, Color.Gray.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("alert_success_done")
+                    ) {
+                        Text("Done", fontWeight = FontWeight.Bold, color = Color.DarkGray)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -16566,14 +16738,27 @@ fun ModifyBookingDialog(
     var isVoice by remember { mutableStateOf(booking.isVoice) }
     var isVideo by remember { mutableStateOf(booking.isVideo) }
     
-    val availableAlternateSlots = listOf(
-        "MON • 4:00 PM - 4:30 PM",
-        "TUE • 10:00 AM - 10:30 AM",
-        "WED • 3:00 PM - 3:30 PM",
-        "THU • 2:00 PM - 2:30 PM",
-        "FRI • 11:00 AM - 11:30 AM",
-        "SAT • 4:00 PM - 4:30 PM"
-    ).filter { it != booking.timing }
+    val parsedDay = booking.timing.substringBefore(" •").trim().uppercase()
+    var selectedDayKey by remember { mutableStateOf(if (parsedDay.length == 3) parsedDay else "MON") }
+    
+    val today = java.time.LocalDate.now()
+    val currentMonday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+    val calendarDays = remember {
+        (0..6).map { i ->
+            val date = currentMonday.plusDays(i.toLong())
+            val isDateToday = date.isEqual(today)
+            val shortName = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()).take(3)
+            val fullName = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault())
+            val labelNum = date.dayOfMonth.toString()
+            CalendarDay(
+                key = shortName.uppercase(),
+                fullName = fullName,
+                labelNum = labelNum,
+                isToday = isDateToday,
+                dateString = date.toString()
+            )
+        }
+    }
 
     var showCancelConfirm by remember { mutableStateOf(false) }
 
@@ -16738,7 +16923,7 @@ fun ModifyBookingDialog(
                         }
                     }
 
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             text = "Reschedule Timing Slot",
                             fontWeight = FontWeight.Bold,
@@ -16746,44 +16931,67 @@ fun ModifyBookingDialog(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         
-                        OutlinedTextField(
-                            value = selectedTiming,
-                            onValueChange = { selectedTiming = it },
-                            label = { Text("Timing Slot String") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            shape = RoundedCornerShape(8.dp)
+                        // Premium Pastel Horizontal Calendar (Image 2 style) inside Modify Appointment (Image 1)
+                        val bookingsList by viewModel.bookingsList.collectAsState()
+                        WisdomBridgeHorizontalCalendar(
+                            selectedDayKey = selectedDayKey,
+                            daysList = calendarDays,
+                            bookingsList = bookingsList,
+                            onDaySelected = { day ->
+                                selectedDayKey = day.key.uppercase()
+                                // Keep the same time of day if possible, or reset to standard timing
+                                val currentOnlyTime = if (selectedTiming.contains(" • ")) selectedTiming.substringAfter(" • ") else "11:00 AM - 11:30 AM"
+                                selectedTiming = "${day.key.uppercase()} • $currentOnlyTime"
+                            },
+                            modifier = Modifier.fillMaxWidth().testTag("modify_dialog_calendar")
                         )
 
                         Spacer(modifier = Modifier.height(4.dp))
+                        
                         Text(
-                            text = "Or quickly swap with expert alternate availability:",
-                            fontSize = 11.sp,
-                            color = Color.Gray,
-                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                            text = "Choose Desired Slot:",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = Color.Gray
                         )
+
+                        val slotsForSelectedDay = remember(selectedDayKey) {
+                            listOf(
+                                "9:00 AM - 9:30 AM",
+                                "11:00 AM - 11:30 AM",
+                                "2:00 PM - 2:30 PM",
+                                "4:00 PM - 4:30 PM",
+                                "6:00 PM - 6:30 PM"
+                            )
+                        }
 
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            availableAlternateSlots.forEach { slot ->
+                            slotsForSelectedDay.forEach { slot ->
+                                val slotTimingString = "${selectedDayKey.uppercase()} • $slot"
+                                val isSelected = selectedTiming.uppercase().trim() == slotTimingString.uppercase().trim()
+                                
                                 Card(
                                     modifier = Modifier
                                         .padding(vertical = 4.dp)
-                                        .clickable { selectedTiming = slot },
+                                        .clickable { selectedTiming = slotTimingString }
+                                        .testTag("reschedule_slot_$slot"),
                                     colors = CardDefaults.cardColors(
-                                        containerColor = if (selectedTiming == slot) MaterialTheme.colorScheme.tertiaryContainer else Color(0xFFE9ECEF)
+                                        containerColor = if (isSelected) MaterialTheme.colorScheme.primary else Color(0xFFF2F2F2)
                                     ),
                                     shape = RoundedCornerShape(12.dp)
                                 ) {
                                     Text(
                                         text = slot,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) Color.White else Color.Black,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                                     )
                                 }
                             }
@@ -16791,16 +16999,22 @@ fun ModifyBookingDialog(
 
                         Spacer(modifier = Modifier.height(6.dp))
                         
-                        OutlinedButton(
-                            onClick = {
-                                viewModel.openScheduler(booking.expertId, booking.id)
-                                onDismiss()
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("📅 Open Visual Scheduler Calendar", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "Selected Timing: ",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Gray
+                            )
+                            Text(
+                                text = selectedTiming,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
                 }

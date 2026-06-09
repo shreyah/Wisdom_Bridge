@@ -1614,7 +1614,8 @@ class AgeNoBarViewModel : ViewModel() {
                 
                 startDirectChat(
                     expertId = expertId,
-                    initialText = "Dear ${expert.name}, I have updated our scheduled session details to: $newTiming ($newDuration mins, ${if (isVideo) "Video Call 🎥" else "Voice Call 📞"})."
+                    initialText = "Dear ${expert.name}, I have updated our scheduled session details to: $newTiming ($newDuration mins, ${if (isVideo) "Video Call 🎥" else "Voice Call 📞"}).",
+                    navigateToTab = false
                 )
             }
         }
@@ -1651,7 +1652,8 @@ class AgeNoBarViewModel : ViewModel() {
                 
                 startDirectChat(
                     expertId = expertId,
-                    initialText = "Dear ${expert.name}, I have unfortunately cancelled my scheduled session on $oldTiming. I will book a different slot when convenient!"
+                    initialText = "Dear ${expert.name}, I have unfortunately cancelled my scheduled session on $oldTiming. I will book a different slot when convenient!",
+                    navigateToTab = false
                 )
             }
         }
@@ -1665,7 +1667,7 @@ class AgeNoBarViewModel : ViewModel() {
         val currentExperts = expertDaoSafe.getAllExperts()
         val deservesCleanRebuild = currentExperts.isEmpty() || currentExperts.any { 
             it.topic.contains(" ") || it.topic != it.topic.lowercase() 
-        } || (sharedPrefs?.getBoolean("db_seeded_v5", false) == false)
+        } || (sharedPrefs?.getBoolean("db_seeded_v7", false) == false)
         if (deservesCleanRebuild) {
             expertDaoSafe.clearAllExperts()
             try {
@@ -1686,7 +1688,8 @@ class AgeNoBarViewModel : ViewModel() {
                     availability = exp.activeOfflineAvailability,
                     rating = exp.rating,
                     session_count = exp.sessionsHosted,
-                    avatar_seed = exp.avatarUrl
+                    avatar_seed = exp.avatarUrl,
+                    tags = exp.tags.joinToString(";")
                 )
             }
             expertDaoSafe.insertExperts(dbExperts)
@@ -1803,7 +1806,7 @@ class AgeNoBarViewModel : ViewModel() {
             android.util.Log.d("AgeNoBarDB", "booking inserted: preseeded default bookings")
             println("DATABASE VERIFICATION: preseeded bookings inserted")
             hasPreseededBookings = true
-            sharedPrefs?.edit()?.putBoolean("db_seeded_v5", true)?.apply()
+            sharedPrefs?.edit()?.putBoolean("db_seeded_v7", true)?.apply()
         }
     }
 }
@@ -1897,13 +1900,30 @@ class AgeNoBarViewModel : ViewModel() {
                 "legal" -> "Legal Counselor"
                 "music" -> "Music Teacher"
                 "gardening" -> "Gardening Expert"
-                else -> "Specialist"
+                "bharatanatyam" -> "Classical Dance Acharya"
+                "veena" -> "Veena Vidwan / Vidushi"
+                "violin" -> "Carnatic Violin Maestro"
+                "vocal music" -> "Indian Classical Vocal Guru"
+                "bhajans" -> "Satsang & Bhajan Guide"
+                "terrace gardening" -> "Terrace Garden Designer"
+                "organic farming" -> "Organic Farming Consultant"
+                "banking" -> "Banking & Security Specialist"
+                "counselling" -> "Mental Health & Empathy Counselor"
+                "physiotherapy" -> "Senior Joint & Physiotherapy Specialist"
+                "meditation" -> "Dhyana & Mindfulness Guide"
+                "nutrition" -> "Diet & Lifestyle Consultant"
+                "cooking" -> "Traditional Culinary Guru"
+                "sanskrit" -> "Sanskrit Grammar & Sloka Scholar"
+                "ramayana" -> "Puranic & Ramayana Storyteller"
+                "traditional arts" -> "Heritage Art & Craft Mentor"
+                else -> "Specialist Mentor"
             },
             category = when(topicLower) {
-                "maths", "science", "languages", "finance", "legal" -> "LEARN & GROW"
-                "wellness" -> "HEALTH & WELLNESS"
-                "music" -> "ARTS, MUSIC & CULTURE"
-                "gardening" -> "NATURE & LIFESTYLE"
+                "maths", "science", "languages", "finance", "legal", "banking", "sanskrit" -> "LEARN & GROW"
+                "wellness", "counselling", "physiotherapy", "meditation", "nutrition" -> "HEALTH & WELLNESS"
+                "music", "bharatanatyam", "veena", "violin", "vocal music", "bhajans", "traditional arts" -> "ARTS, MUSIC & CULTURE"
+                "gardening", "terrace gardening", "organic farming", "cooking" -> "NATURE & LIFESTYLE"
+                "ramayana" -> "STORIES & HERITAGE"
                 else -> "LEARN & GROW"
             },
             yearsOfExperience = experience_years,
@@ -1916,6 +1936,22 @@ class AgeNoBarViewModel : ViewModel() {
                 "legal" -> "⚖️"
                 "music" -> "🎵"
                 "gardening" -> "🌱"
+                "bharatanatyam" -> "💃"
+                "veena" -> "🪕"
+                "violin" -> "🎻"
+                "vocal music" -> "🎤"
+                "bhajans" -> "📿"
+                "terrace gardening" -> "🏡"
+                "organic farming" -> "🚜"
+                "banking" -> "🏦"
+                "counselling" -> "🤝"
+                "physiotherapy" -> "🦾"
+                "meditation" -> "🧘‍♀️"
+                "nutrition" -> "🍎"
+                "cooking" -> "🍳"
+                "sanskrit" -> "📜"
+                "ramayana" -> "📖"
+                "traditional arts" -> "🎨"
                 else -> "🎓"
             },
             languages = languages.split(";").map { it.trim() },
@@ -1931,6 +1967,7 @@ class AgeNoBarViewModel : ViewModel() {
             activeOfflineAvailability = availability,
             flatSessionFee = rate_per_30min,
             skillsTags = listOf(topic, "Professional Mentorship", "1:1 Live Help"),
+            tags = tags.split(";").map { it.trim() }.filter { it.isNotEmpty() },
             communityWall = emptyList(),
             testimonialsList = listOf(
                 Testimonial(authorName = "Aarav S.", text = "Excellent explanation of complex concepts! Highly recommended.", rating = 5.0, date = "Last week")
@@ -2265,7 +2302,7 @@ class AgeNoBarViewModel : ViewModel() {
     }
 
     // -- PROFILE CHAT ACTION TRIGGER --
-    fun startDirectChat(expertId: String, initialText: String? = null) {
+    fun startDirectChat(expertId: String, initialText: String? = null, navigateToTab: Boolean = true) {
         val expert = _experts.value.find { it.id == expertId }
         val recipientName = expert?.name ?: "Expert"
         val recipientAvatar = expert?.avatarUrl ?: "avatar_rajesh"
@@ -2327,8 +2364,10 @@ class AgeNoBarViewModel : ViewModel() {
             saveConversations()
         }
         
-        // Navigate to the messages companion page automatically
-        selectTab(AppTab.Messages)
+        // Navigate to the messages companion page automatically if specified
+        if (navigateToTab) {
+            selectTab(AppTab.Messages)
+        }
     }
 
     fun selectDirectConversation(id: String?) {
@@ -2434,7 +2473,8 @@ class AgeNoBarViewModel : ViewModel() {
             val typeStr = if (isVideo) "Video Classroom Session" else "Voice Consultation"
             startDirectChat(
                 expertId = expertId,
-                initialText = "Dear ${expert.name}, I have scheduled a 1:1 $typeStr for $selectedTime ($durationMinutes min) on Wisdom Bridge! Looking forward to learning from your experience."
+                initialText = "Dear ${expert.name}, I have scheduled a 1:1 $typeStr for $selectedTime ($durationMinutes min) on Wisdom Bridge! Looking forward to learning from your experience.",
+                navigateToTab = false
             )
         }
     }
@@ -2507,7 +2547,8 @@ class AgeNoBarViewModel : ViewModel() {
                 // Write notification chat to thread
                 startDirectChat(
                     expertId = expertId,
-                    initialText = "Dear ${expert.name}, I have rescheduled our session to $newTiming. Apologies for any inconvenience caused. Looking forward to our session!"
+                    initialText = "Dear ${expert.name}, I have rescheduled our session to $newTiming. Apologies for any inconvenience caused. Looking forward to our session!",
+                    navigateToTab = false
                 )
             }
         }
@@ -2772,6 +2813,18 @@ class AgeNoBarViewModel : ViewModel() {
                 val idSuffix = finalName.lowercase().replace(" ", "_").replace(".", "")
                 val uniqueId = "exp_seed_${cat.topic}_$i"
                 
+                val defaultTags = when (cat.topic) {
+                    "maths" -> listOf("Maths", "Science", "STEM", "Education & Tutoring", "LEARN & GROW")
+                    "science" -> listOf("Science", "Technology", "STEM", "Traditional Skills", "LEARN & GROW")
+                    "languages" -> listOf("Languages", "English", "Traditional Skills", "LEARN & GROW")
+                    "finance" -> listOf("Finance", "Financial Literacy", "LEARN & GROW")
+                    "legal" -> listOf("Legal", "Legal Knowledge", "LEARN & GROW")
+                    "wellness" -> listOf("Wellness", "Ayurveda", "Yoga", "HEALTH & WELLNESS")
+                    "music" -> listOf("Music", "Arts", "Culture", "Traditional Skills", "ARTS, MUSIC & CULTURE")
+                    "gardening" -> listOf("Gardening", "Plants", "Nature", "NATURE & LIFESTYLE")
+                    else -> listOf(cat.topic)
+                } + cat.skills + listOf(cat.subExp)
+
                 // Construct realistic, rich, multi-dimensional profiles
                 list.add(
                     Expert(
@@ -2792,10 +2845,238 @@ class AgeNoBarViewModel : ViewModel() {
                         introductionText = "Welcome grandchildren! Let's sit together and explore the beauty of " + cat.subExp + " today. Pranam.",
                         myStoryText = finalName + " has dedicated " + (25 + i * 3) + " glorious years to their calling. " + cat.story + " AI Chachi says: 'They are an absolute pillar of our community! Talk to them to experience deep traditional care and clarity.'",
                         skillsTags = cat.skills + listOf(cat.subExp, "Interactive learning"),
+                        tags = defaultTags,
                         activeOfflineAvailability = cat.avail,
                         flatSessionFee = cat.fee - (i * 15),
                         isOnlineNow = (i % 3 == 0),
                         topic = cat.topic
+                    )
+                )
+            }
+        }
+
+        // Explicit user-requested test experts to fulfill:
+        // Science: Dr. Rao, Prof. Sharma, Dr. Meera
+        // Technology: Dr. Rao, Anand Kumar, Ravi Menon
+        // STEM: Dr. Rao, Prof. Sharma, Anand Kumar
+        list.add(
+            Expert(
+                id = "exp_dr_rao",
+                name = "Dr. Rao",
+                title = "Senior STEM & Technology Mentor",
+                category = "LEARN & GROW",
+                yearsOfExperience = 32,
+                areaEmoji = "🔬",
+                isVerifiedExpert = true,
+                languages = listOf("English", "Hindi", "Telugu"),
+                rating = 4.9,
+                testimonialsCount = 28,
+                peopleHelpedCount = 190,
+                avatarUrl = "avatar_dr_rao",
+                bio = "Specialist in engineering concepts, coding fundamentals, and fun science models.",
+                certificationStatus = "Ph.D. in STEM Education",
+                introductionText = "Welcome beta! Let's explore science, technology, and coding in a friendly way.",
+                myStoryText = "Dr. Rao spent 32 years teaching college students. AI Chachi says: 'Dr. Rao is exceptionally warm! He explains science like a beautiful story.'",
+                skillsTags = listOf("Science", "Technology", "STEM", "Coding", "Physics"),
+                tags = listOf("Science", "Technology", "STEM"),
+                activeOfflineAvailability = "Daily 4 PM - 6 PM",
+                flatSessionFee = 0,
+                isOnlineNow = true,
+                topic = "science"
+            )
+        )
+
+        list.add(
+            Expert(
+                id = "exp_prof_sharma",
+                name = "Prof. Sharma",
+                title = "Physics & Applied STEM Professor",
+                category = "LEARN & GROW",
+                yearsOfExperience = 28,
+                areaEmoji = "📐",
+                isVerifiedExpert = true,
+                languages = listOf("English", "Hindi"),
+                rating = 4.88,
+                testimonialsCount = 22,
+                peopleHelpedCount = 140,
+                avatarUrl = "avatar_prof_sharma",
+                bio = "Simplifying basic gravity, space exploration, and aerospace concepts for kids.",
+                certificationStatus = "Certified STEM Educator",
+                introductionText = "Namaste! Let's unlock the secrets of physical sciences together.",
+                myStoryText = "Prof. Sharma loves creating safe household chemistry and physics lab prototypes.",
+                skillsTags = listOf("Science", "STEM", "Physics", "Thermodynamics"),
+                tags = listOf("Science", "STEM"),
+                activeOfflineAvailability = "Wed-Fri 3 PM - 5 PM",
+                flatSessionFee = 0,
+                isOnlineNow = true,
+                topic = "science"
+            )
+        )
+
+        list.add(
+            Expert(
+                id = "exp_dr_meera",
+                name = "Dr. Meera",
+                title = "Cellular Biology & Nature Scientist",
+                category = "LEARN & GROW",
+                yearsOfExperience = 26,
+                areaEmoji = "🌿",
+                isVerifiedExpert = true,
+                languages = listOf("English", "Tamil"),
+                rating = 4.92,
+                testimonialsCount = 19,
+                peopleHelpedCount = 110,
+                avatarUrl = "avatar_dr_meera",
+                bio = "Exploring plant cells, environment systems, and biology fundamentals.",
+                certificationStatus = "Member of National Biotech Council",
+                introductionText = "Hello! Let's study gardening biology and bio-mechanics.",
+                myStoryText = "Dr. Meera has spent decades in laboratory projects before starting teaching.",
+                skillsTags = listOf("Science", "Biology", "Botany"),
+                tags = listOf("Science"),
+                activeOfflineAvailability = "Weekends 10 AM - 12 PM",
+                flatSessionFee = 0,
+                isOnlineNow = false,
+                topic = "science"
+            )
+        )
+
+        list.add(
+            Expert(
+                id = "exp_anand_kumar",
+                name = "Anand Kumar",
+                title = "Senior Software Architect & IT Mentor",
+                category = "LEARN & GROW",
+                yearsOfExperience = 30,
+                areaEmoji = "💻",
+                isVerifiedExpert = true,
+                languages = listOf("English", "Hindi"),
+                rating = 4.95,
+                testimonialsCount = 45,
+                peopleHelpedCount = 410,
+                avatarUrl = "avatar_anand_kumar",
+                bio = "Teaching basic Python, computer safety, and internet fundamentals to kids and seniors.",
+                certificationStatus = "Ex-Director Technology Projects",
+                introductionText = "Pranam! Coding is like cooking—it is just following a yummy recipe step by step.",
+                myStoryText = "Anand is highly passionate about spreading digital education to remote areas.",
+                skillsTags = listOf("Technology", "STEM", "Coding", "Python", "Computers"),
+                tags = listOf("Technology", "STEM"),
+                activeOfflineAvailability = "Tue-Thu 5 PM - 7 PM",
+                flatSessionFee = 0,
+                isOnlineNow = true,
+                topic = "science"
+            )
+        )
+
+        list.add(
+            Expert(
+                id = "exp_ravi_menon",
+                name = "Ravi Menon",
+                title = "E-Commerce & Digital Tools Specialist",
+                category = "LEARN & GROW",
+                yearsOfExperience = 25,
+                areaEmoji = "📱",
+                isVerifiedExpert = true,
+                languages = listOf("English", "Malayalam"),
+                rating = 4.85,
+                testimonialsCount = 15,
+                peopleHelpedCount = 85,
+                avatarUrl = "avatar_ravi_menon",
+                bio = "Helping setup micro businesses, understand UPI payments, and use smart gadgets.",
+                certificationStatus = "Technology Empowerment Lead",
+                introductionText = "Hello! Technology should make your life simpler and happier, not confusing.",
+                myStoryText = "Ravi hosts community tech drives helping grandparents confidently navigate banking apps.",
+                skillsTags = listOf("Technology", "UPI Payments", "Digital Tools"),
+                tags = listOf("Technology"),
+                activeOfflineAvailability = "Saturdays 3 PM - 6 PM",
+                flatSessionFee = 0,
+                isOnlineNow = true,
+                topic = "science"
+            )
+        )
+
+        // Dynamically populate 3 experts for each of the 17 requested topics to satisfy the requirement
+        val topicGroups = listOf(
+            Triple("bharatanatyam", "Classical Dance", listOf("Smt. Rukmini Sripada", "Vidhushi Leela Samson", "Guru Priyamvada Acharya")),
+            Triple("veena", "Veena Artistry", listOf("Dr. Jeyaraaj Pillai", "Saraswathi Chidambaram", "Rajhesh Vaidhya Swamy")),
+            Triple("violin", "Violin Mastery", listOf("Lalgudi GJR Raman", "Vidhushi A. Kanyakumari", "Dr. M. Lalitha Sister")),
+            Triple("vocal music", "Vocal Sing & Voice", listOf("Sanjay Subrahmanyan Iyer", "Sudha Ragunathan Singer", "Aruna Sairam Bhajan")),
+            Triple("bhajans", "Devotional Bhajans", listOf("Hariom Sharan Devotional", "Anup Jalota Samrat", "Sanjeev Abhyankar Vocal")),
+            Triple("gardening", "Green Gardening", listOf("Balkrishna Kamat Root", "Urmila Sen Balcony", "Savita Deshpande Soil")),
+            Triple("terrace gardening", "Terrace Greenery", listOf("Major Gen. Dutta Sky", "Dr. Prabhakar Rao Organic", "Kiran Doshi Roof")),
+            Triple("organic farming", "Sustainable Farming", listOf("Subhash Palekar Zero", "Devendra Sharma Earth", "Dr. Vandana Shiva Native")),
+            Triple("banking", "Financial Security", listOf("Gopalakrishnan Iyer Bank", "Srinivas Rao Guard", "Shyamala Gopinath Former")),
+            Triple("counselling", "Emotional Support", listOf("Dr. Shailesh Kumar Heart", "Prof. Aruna Goel Calm", "Sister Shivani Wisdom")),
+            Triple("physiotherapy", "Joint Movement", listOf("Dr. Ramesh Krishnan Knee", "Dr. Ali Irani Sports", "Dr. Priya Deshmukh Pain")),
+            Triple("meditation", "Mindfulness Dhyana", listOf("Sri Sri Ravishankar Peace", "Ma Anandamayee Sleep", "Swami Chidanand Meditation")),
+            Triple("nutrition", "Diet & Grains", listOf("Dr. Prabhas Varrier Diet", "Rujuta Diwekar Ghee", "Dr. Shikha Sharma Nutri")),
+            Triple("cooking", "Traditional Recipes", listOf("Tarla Dalal Pickle", "Vikas Khanna Spice", "Chef Kunal Kapur Feast")),
+            Triple("sanskrit", "Vedic Sanskrit Panini", listOf("Acharya Shastri Sloka", "Dr. Sampad Mishra Rhythms", "Prof. Pushpa Dixit Formula")),
+            Triple("ramayana", "Epic Scriptures", listOf("Kalluri Rao Sundarakanda", "Dr. Dushyanth Sridhar Epics", "Pt. Ramswarup Vyas")),
+            Triple("traditional arts", "Folk Crafts", listOf("Kalyani Devi Cheriyal", "Smt. Shashi Iyengar Tanjore", "Pt. Dwaraka Prasad Pottery"))
+        )
+
+        for (group in topicGroups) {
+            val (t, desc, names) = group
+            for (j in 0 until 3) {
+                val name = names[j]
+                val idSuffix = name.lowercase().replace(" ", "_").replace(".", "")
+                val uniqueId = "exp_req_seed_${t}_$j"
+                val category = when (t) {
+                    "maths", "science", "languages", "finance", "legal", "banking", "sanskrit" -> "LEARN & GROW"
+                    "wellness", "counselling", "physiotherapy", "meditation", "nutrition" -> "HEALTH & WELLNESS"
+                    "music", "bharatanatyam", "veena", "violin", "vocal music", "bhajans", "traditional arts" -> "ARTS, MUSIC & CULTURE"
+                    "gardening", "terrace gardening", "organic farming", "cooking" -> "NATURE & LIFESTYLE"
+                    "ramayana" -> "STORIES & HERITAGE"
+                    else -> "LEARN & GROW"
+                }
+                
+                val displayTag = t.split(" ").joinToString(" ") { it.replaceFirstChar { char -> char.uppercase() } }
+
+                val targetTags = when (t) {
+                    "bharatanatyam" -> listOf("Bharatanatyam", "Classical Music", "Arts & Culture", "Traditional Arts")
+                    "veena" -> listOf("Veena", "Carnatic Music", "Classical Music", "Arts & Culture", "Traditional Arts")
+                    "violin" -> listOf("Violin", "Carnatic Music", "Classical Music", "Arts & Culture", "Traditional Arts")
+                    "vocal music" -> listOf("Vocal Music", "Carnatic Music", "Classical Music", "Arts & Culture", "Traditional Arts")
+                    "bhajans" -> listOf("Bhajans", "Devotional Bhajans", "Arts & Culture", "Sanskrit", "Ramayana")
+                    "gardening" -> listOf("Gardening", "Plants", "Nature & Lifestyle")
+                    "terrace gardening" -> listOf("Terrace Gardening", "Gardening", "Plants", "Nature & Lifestyle")
+                    "organic farming" -> listOf("Organic Farming", "Gardening", "Nature & Lifestyle", "Agriculture")
+                    "banking" -> listOf("Banking", "Finance", "Financial Literacy", "LEARN & GROW")
+                    "counselling" -> listOf("Counselling", "Mental Health", "Wellness", "HEALTH & WELLNESS")
+                    "physiotherapy" -> listOf("Physiotherapy", "Joint Care", "Wellness", "HEALTH & WELLNESS")
+                    "meditation" -> listOf("Meditation", "Mindfulness", "Wellness", "HEALTH & WELLNESS")
+                    "nutrition" -> listOf("Nutrition", "Diet", "Wellness", "HEALTH & WELLNESS")
+                    "cooking" -> listOf("Cooking", "Traditional Recipes", "Nature & Lifestyle")
+                    "sanskrit" -> listOf("Sanskrit", "Languages", "Traditional Skills", "LEARN & GROW", "Stories & Heritage")
+                    "ramayana" -> listOf("Ramayana", "Heritage", "Stories & Heritage", "Traditional Arts")
+                    "traditional arts" -> listOf("Traditional Arts", "Arts", "Culture", "Arts & Culture")
+                    else -> listOf(displayTag)
+                }
+
+                list.add(
+                    Expert(
+                        id = uniqueId,
+                        name = name,
+                        title = "Veteran $displayTag Coach",
+                        category = category,
+                        yearsOfExperience = 24 + j * 4 + (idSuffix.length % 5),
+                        areaEmoji = "🎓", 
+                        isVerifiedExpert = true,
+                        languages = listOf("English", if (j % 2 == 0) "Hindi" else "Assamese"),
+                        rating = 4.8 + (j * 0.05),
+                        testimonialsCount = 15 + (j * 5),
+                        peopleHelpedCount = 95 + (j * 30),
+                        avatarUrl = "avatar_${idSuffix}",
+                        bio = "Specialist in $desc, offering customized 1:1 online support tailored perfectly for grandchildren and seniors with beautiful patience.",
+                        certificationStatus = "Certified Specialist",
+                        introductionText = "Pranam! I am honored to support your exploration of $displayTag. Let's start with high joy!",
+                        myStoryText = "$name has spent over " + (20 + j * 5) + " glorious years teaching and perfecting their art. AI Chachi says: 'They are incredibly warm and possess the softest heart of our entire community!'",
+                        skillsTags = listOf(displayTag, desc, "Heritage Exploration"),
+                        tags = targetTags + listOf(displayTag, category),
+                        activeOfflineAvailability = "Everyday " + (j + 3) + " PM - " + (j + 6) + " PM",
+                        flatSessionFee = 0,
+                        isOnlineNow = (j % 2 == 0),
+                        topic = t
                     )
                 )
             }

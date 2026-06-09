@@ -1576,7 +1576,8 @@ data class BookingConfirmationData(
     val timing: String,
     val category: String,
     val emoji: String,
-    val isReschedule: Boolean = false
+    val isReschedule: Boolean = false,
+    val expertId: String = ""
 )
 
 fun formatTimingWithDate(timing: String): String {
@@ -1835,6 +1836,28 @@ fun Modifier.sessionsHaloWrapper(): Modifier = this.drawBehind {
     )
 }.padding(2.5.dp)
 
+sealed interface MyScheduleItem {
+    val id: String
+    val timeLabel: String
+    
+    data class TutoringSession(
+        override val id: String,
+        val expertId: String,
+        val mentorName: String,
+        val topic: String,
+        override val timeLabel: String,
+        val booking: Booking
+    ) : MyScheduleItem
+    
+    data class WorkshopSession(
+        override val id: String,
+        val title: String,
+        val hostName: String,
+        override val timeLabel: String,
+        val event: CommunityEvent
+    ) : MyScheduleItem
+}
+
 @Composable
 fun HomeDashboardScreen(
     viewModel: AgeNoBarViewModel,
@@ -1852,6 +1875,29 @@ fun HomeDashboardScreen(
     val bookingsList by viewModel.bookingsList.collectAsState()
 
     val isTeacherMode = user.userRoleType == "Teach"
+
+    val weekDays = remember {
+        val today = try {
+            java.time.LocalDate.now()
+        } catch (e: Exception) {
+            java.time.LocalDate.of(2026, 6, 9)
+        }
+        val daysToSubtract = if (today.dayOfWeek == java.time.DayOfWeek.SUNDAY) 0 else today.dayOfWeek.value
+        val sunday = today.plusDays(-(daysToSubtract.toLong()))
+        (0..6).map { offset ->
+            val date = sunday.plusDays(offset.toLong())
+            val isDateToday = date.isEqual(today)
+            val shortName = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()).uppercase()
+            val fullName = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault())
+            CalendarDay(
+                key = shortName.take(3),
+                fullName = fullName,
+                labelNum = date.dayOfMonth.toString(),
+                isToday = isDateToday,
+                dateString = date.toString()
+            )
+        }
+    }
 
     var showQuickQuestionDialog by remember { mutableStateOf(false) }
     var selectedCircleCategory by remember { mutableStateOf("All") }
@@ -2031,6 +2077,7 @@ fun HomeDashboardScreen(
         calendarDays.find { it.isToday }?.dateString ?: ""
     }
     var selectedCalendarDay by remember(initiallySelectedDay) { mutableStateOf(initiallySelectedDay) }
+    var currentSessionIndex by remember(selectedCalendarDay) { mutableStateOf(0) }
 
     var screenBackstack by remember { mutableStateOf<List<NavigationState>>(listOf(NavigationState.Dashboard)) }
     var selectedExpertForProfileState by remember { mutableStateOf<Expert?>(null) }
@@ -2133,6 +2180,9 @@ fun HomeDashboardScreen(
                     },
                     onHostClick = {
                         selectedExpertForProfileState = fullHostExpert
+                    },
+                    onNavigateToCalendar = {
+                        viewModel.openScheduler("common_calendar")
                     }
                 )
             }
@@ -2208,6 +2258,24 @@ fun HomeDashboardScreen(
                             )
                         }
 
+                        // Quick Access Common Calendar (styled premium)
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(Color.White, CircleShape)
+                                .border(1.dp, BorderLightSystem, CircleShape)
+                                .clickable { viewModel.openScheduler("common_calendar") }
+                                .testTag("top_calendar_quick_access"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.CalendarMonth,
+                                contentDescription = "Quick Calendar",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
                         // Notification Bell (styled premium with a subtle active indicator dot)
                         Box(
                             modifier = Modifier
@@ -2270,403 +2338,704 @@ fun HomeDashboardScreen(
                 }
             }
 
-            // ITEM 3: Elevated Community Bulletin with individual pastel multilayer custom boxes
+            // ITEM 3: Elevated Community Bulletin with individual compact pill-shaped action buttons in a horizontal row
             item {
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("notice_board_bulletin")
-                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Notice board Header
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    // Action 1: Ask AI Chachi
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(46.dp)
+                            .shadow(2.dp, RoundedCornerShape(23.dp))
+                            .clickable {
+                                viewModel.selectDirectConversation(null)
+                                viewModel.selectTab(AppTab.Messages)
+                            }
+                            .testTag("chachi_banner_card_trigger"),
+                        shape = RoundedCornerShape(23.dp),
+                        color = Color(0xFFFFF0F5), // Soft pastel lavender/pink
+                        border = BorderStroke(1.2.dp, Color(0xFFFFD1DC))
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("📌", fontSize = 18.sp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "COMMUNITY BULLETIN",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = 0.5.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        Box(
+                        Row(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.primaryContainer)
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                                .fillMaxSize()
+                                .padding(horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
                         ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.img_ai_chachi),
+                                contentDescription = "Chachi avatar",
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Quick Access",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
+                                text = "Ask AI",
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    // Three option bulletin card grid with beautiful individual pastel multilayer custom boxes
-                    Row(
+                    // Action 2: Find Expert
+                    Surface(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            .weight(1f)
+                            .height(46.dp)
+                            .shadow(2.dp, RoundedCornerShape(23.dp))
+                            .clickable {
+                                viewModel.selectTab(AppTab.SearchRecommend)
+                            }
+                            .testTag("notice_find_expert_trigger"),
+                        shape = RoundedCornerShape(23.dp),
+                        color = Color(0xFFEBF5FB), // Soft sky blue
+                        border = BorderStroke(1.2.dp, Color(0xFFBBDEFB))
                     ) {
-                        // Tile 1: AI Chachi (Bulletin gradient)
-                        Box(
+                        Row(
                             modifier = Modifier
-                                .weight(1f)
-                                .height(112.dp)
-                                .bulletinHaloWrapper()
-                                .clickable {
-                                    viewModel.selectDirectConversation(null)
-                                    viewModel.selectTab(AppTab.Messages)
-                                }
-                                .testTag("chachi_banner_card_trigger")
+                                .fillMaxSize()
+                                .padding(horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .whiteCardShadow()
-                                    .padding(4.dp)
-                            ) {
-                                Column(
-                                    modifier = Modifier.fillMaxSize(),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Image(
-                                            painter = painterResource(id = R.drawable.img_ai_chachi),
-                                            contentDescription = "Chachi avatar",
-                                            modifier = Modifier.size(30.dp).clip(CircleShape),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "AI Chachi",
-                                        fontWeight = FontWeight.ExtraBold,
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Spacer(modifier = Modifier.height(1.dp))
-                                    Text(
-                                        text = "Ask Anything",
-                                        fontSize = 8.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
+                            Text("👨‍🏫", fontSize = 16.sp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Find Expert",
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
+                    }
 
-                        // Tile 2: Find Expert (Sessions gradient)
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(112.dp)
-                                .sessionsHaloWrapper()
-                                .clickable {
-                                    viewModel.selectTab(AppTab.SearchRecommend)
-                                }
-                                .testTag("notice_find_expert_trigger")
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .whiteCardShadow()
-                                    .padding(4.dp)
-                            ) {
-                                Column(
-                                    modifier = Modifier.fillMaxSize(),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f), CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("👨‍🏫", fontSize = 18.sp)
-                                    }
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "Find Expert",
-                                        fontWeight = FontWeight.ExtraBold,
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Spacer(modifier = Modifier.height(1.dp))
-                                    Text(
-                                        text = "Browse Mentors",
-                                        fontSize = 8.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.secondary,
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
+                    // Action 3: Join Circle
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(46.dp)
+                            .shadow(2.dp, RoundedCornerShape(23.dp))
+                            .clickable {
+                                viewModel.selectTab(AppTab.Communities)
                             }
-                        }
-
-                        // Tile 3: Join Circle (Bulletin gradient)
-                        Box(
+                            .testTag("notice_join_circle_trigger"),
+                        shape = RoundedCornerShape(23.dp),
+                        color = Color(0xFFE8F8F5), // Soft pastel teal/mint
+                        border = BorderStroke(1.2.dp, Color(0xFFA3E4D7))
+                    ) {
+                        Row(
                             modifier = Modifier
-                                .weight(1f)
-                                .height(112.dp)
-                                .bulletinHaloWrapper()
-                                .clickable { viewModel.selectTab(AppTab.Communities) }
-                                .testTag("notice_join_circle_trigger")
+                                .fillMaxSize()
+                                .padding(horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .whiteCardShadow()
-                                    .padding(4.dp)
-                            ) {
-                                Column(
-                                    modifier = Modifier.fillMaxSize(),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f), CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("👥", fontSize = 18.sp)
-                                    }
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "Join Circle",
-                                        fontWeight = FontWeight.ExtraBold,
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Spacer(modifier = Modifier.height(1.dp))
-                                    Text(
-                                        text = "Meet Communities",
-                                        fontSize = 8.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.tertiary,
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
+                            Text("👥", fontSize = 16.sp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Join Circle",
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
                 }
             }
 
             item {
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("home_upcoming_sessions_section")
                         .whiteCardShadow()
                         .padding(12.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth()
+                    // Header
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 4.dp, vertical = 2.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Upcoming Sessions 📅",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "View All",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF8B1A1A),
-                                modifier = Modifier.clickable {
-                                    viewModel.openScheduler("exp_seed_maths_1")
+                        Text(
+                            text = "My Schedule 📅",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "View All",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF8B1A1A),
+                            modifier = Modifier.clickable {
+                                viewModel.openScheduler("common_calendar")
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Horizontal Week Calendar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        weekDays.forEach { day ->
+                            val isSelected = selectedCalendarDay == day.dateString
+                            
+                            // Booked topics mapped to specialized categories to show distinct colored indicators
+                            val daySessionColors = remember(day, bookingsList, events, experts) {
+                                val dayKeyUpper = day.key.uppercase()
+                                val dayNameUpper = day.fullName.uppercase()
+                                val colors = mutableListOf<Color>()
+
+                                val hasBookingWithTopic = { filterFn: (String) -> Boolean ->
+                                    bookingsList.any { b ->
+                                        val statusOk = b.status == "Upcoming" || b.status == "Joined" || b.status == "confirmed"
+                                        if (statusOk) {
+                                            val timingUpper = b.timing.uppercase()
+                                            val matched = timingUpper.contains(dayKeyUpper) || timingUpper.contains(dayNameUpper) || (day.isToday && timingUpper.contains("TODAY"))
+                                            if (matched) {
+                                                val matchedExpert = experts.find { it.id == b.expertId }
+                                                val topic = matchedExpert?.topic ?: ""
+                                                filterFn(topic.lowercase())
+                                            } else false
+                                        } else false
+                                    }
                                 }
+
+                                val hasEventWithTitle = { filterFn: (String) -> Boolean ->
+                                    events.any { ev ->
+                                        if (ev.isUserRsvped) {
+                                            val timeUpper = ev.localTime.uppercase()
+                                            val matched = timeUpper.contains(dayKeyUpper) || timeUpper.contains(dayNameUpper) || (day.isToday && timeUpper.contains("TODAY"))
+                                            if (matched) {
+                                                filterFn(ev.title.lowercase())
+                                            } else false
+                                        } else false
+                                    }
+                                }
+
+                                // 🌱 Gardening = Green
+                                if (hasBookingWithTopic { it.contains("garden") || it.contains("plant") } ||
+                                    hasEventWithTitle { it.contains("garden") || it.contains("plant") }) {
+                                    colors.add(Color(0xFF4CAF50))
+                                }
+
+                                // 🎵 Music = Amber
+                                if (hasBookingWithTopic { it.contains("music") || it.contains("singing") || it.contains("instrument") || it.contains("vocal") || it.contains("song") } ||
+                                    hasEventWithTitle { it.contains("music") || it.contains("singing") || it.contains("instrument") || it.contains("vocal") || it.contains("song") }) {
+                                    colors.add(Color(0xFFFFC107))
+                                }
+
+                                // 🍲 Recipes = Orange
+                                if (hasBookingWithTopic { it.contains("recip") || it.contains("cook") || it.contains("traditional") || it.contains("cuisine") || it.contains("food") } ||
+                                    hasEventWithTitle { it.contains("recip") || it.contains("cook") || it.contains("traditional") || it.contains("cuisine") || it.contains("food") }) {
+                                    colors.add(Color(0xFFFF9800))
+                                }
+
+                                // 📖 Stories = Beige
+                                if (hasBookingWithTopic { it.contains("stori") || it.contains("shloka") || it.contains("wisdom") || it.contains("epic") || it.contains("folklore") } ||
+                                    hasEventWithTitle { it.contains("stori") || it.contains("shloka") || it.contains("wisdom") || it.contains("epic") || it.contains("folklore") }) {
+                                    colors.add(Color(0xFFD7CCC8))
+                                }
+
+                                // 📚 Learn & Grow = Purple (any other topic/session default)
+                                val hasOthers = bookingsList.any { b ->
+                                    val statusOk = b.status == "Upcoming" || b.status == "Joined" || b.status == "confirmed"
+                                    if (statusOk) {
+                                        val timingUpper = b.timing.uppercase()
+                                        val matched = timingUpper.contains(dayKeyUpper) || timingUpper.contains(dayNameUpper) || (day.isToday && timingUpper.contains("TODAY"))
+                                        if (matched) {
+                                            val matchedExpert = experts.find { it.id == b.expertId }
+                                            val topicL = (matchedExpert?.topic ?: "").lowercase()
+                                            !(topicL.contains("garden") || topicL.contains("plant") || topicL.contains("music") || topicL.contains("singing") || topicL.contains("instrument") || topicL.contains("vocal") || topicL.contains("song") || topicL.contains("recip") || topicL.contains("cook") || topicL.contains("traditional") || topicL.contains("cuisine") || topicL.contains("food") || topicL.contains("stori") || topicL.contains("shloka") || topicL.contains("wisdom") || topicL.contains("epic") || topicL.contains("folklore"))
+                                        } else false
+                                    } else false
+                                } || events.any { ev ->
+                                    if (ev.isUserRsvped) {
+                                        val timeUpper = ev.localTime.uppercase()
+                                        val matched = timeUpper.contains(dayKeyUpper) || timeUpper.contains(dayNameUpper) || (day.isToday && timeUpper.contains("TODAY"))
+                                        if (matched) {
+                                            val titleL = ev.title.lowercase()
+                                            !(titleL.contains("garden") || titleL.contains("plant") || titleL.contains("music") || titleL.contains("singing") || titleL.contains("instrument") || titleL.contains("vocal") || titleL.contains("song") || titleL.contains("recip") || titleL.contains("cook") || titleL.contains("traditional") || titleL.contains("cuisine") || titleL.contains("food") || titleL.contains("stori") || titleL.contains("shloka") || titleL.contains("wisdom") || titleL.contains("epic") || titleL.contains("folklore"))
+                                        } else false
+                                    } else false
+                                }
+                                if (hasOthers) {
+                                    colors.add(Color(0xFF9C27B0))
+                                }
+
+                                colors
+                            }
+
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        selectedCalendarDay = day.dateString
+                                    }
+                            ) {
+                                Text(
+                                    text = day.key,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) Color(0xFF4A148C) else Color.Gray.copy(alpha = 0.8f)
+                                )
+
+                                Spacer(modifier = Modifier.height(3.dp))
+
+                                // Selected date uses a stronger lavender pill style with a soft shadow and slightly larger typography
+                                Box(
+                                    modifier = Modifier
+                                        .size(if (isSelected) 34.dp else 28.dp)
+                                        .then(
+                                            if (isSelected) {
+                                                Modifier
+                                                    .shadow(2.5.dp, CircleShape)
+                                                    .background(
+                                                        Brush.linearGradient(
+                                                            colors = listOf(Color(0xFFEDE7F6), Color(0xFFD1C4E9))
+                                                        ),
+                                                        CircleShape
+                                                    )
+                                                    .border(1.2.dp, Color(0xFF7E57C2), CircleShape)
+                                            } else {
+                                                Modifier.background(Color.Transparent)
+                                            }
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = day.labelNum,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontSize = if (isSelected) 14.sp else 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Bold,
+                                        color = if (isSelected) Color(0xFF4A148C) else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(3.dp))
+
+                                // Customized category dots displayed underneath
+                                Row(
+                                    modifier = Modifier.height(5.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    daySessionColors.forEach { indicatorColor ->
+                                        Box(
+                                            modifier = Modifier
+                                                .size(4.dp)
+                                                .background(indicatorColor, CircleShape)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Today's Session Card
+                    val sessionsForSelectedDay = remember(selectedCalendarDay, bookingsList, events) {
+                        val activeDayObject = weekDays.find { it.dateString == selectedCalendarDay } ?: weekDays[0]
+                        val dayKeyUpper = activeDayObject.key.uppercase()
+                        val dayNameUpper = activeDayObject.fullName.uppercase()
+                        
+                        // Get Booked Sessions
+                        val dayBookings = bookingsList.filter { b ->
+                            val statusOk = b.status == "Upcoming" || b.status == "Joined" || b.status == "confirmed"
+                            if (!statusOk) return@filter false
+                            val timingUpper = b.timing.uppercase()
+                            timingUpper.contains(dayKeyUpper) || timingUpper.contains(dayNameUpper) ||
+                                    (activeDayObject.isToday && timingUpper.contains("TODAY"))
+                        }.map { b ->
+                            val matchedExpert = experts.find { it.id == b.expertId }
+                            val topic = matchedExpert?.topic ?: "Expert Session"
+                            val timePart = if (b.timing.contains("•")) b.timing.substringAfter("•").trim() else b.timing
+                            val formattedTime = if (activeDayObject.isToday) "Today • $timePart" else "${activeDayObject.fullName} • $timePart"
+                            
+                            MyScheduleItem.TutoringSession(
+                                id = b.id,
+                                expertId = b.expertId,
+                                mentorName = b.expertName,
+                                topic = topic,
+                                timeLabel = formattedTime,
+                                booking = b
                             )
                         }
                         
-                        Spacer(modifier = Modifier.height(6.dp))
+                        // Get RSVPed Workshops
+                        val dayEvents = events.filter { ev ->
+                            if (!ev.isUserRsvped) return@filter false
+                            val timeUpper = ev.localTime.uppercase()
+                            timeUpper.contains(dayKeyUpper) || timeUpper.contains(dayNameUpper) ||
+                                    (activeDayObject.isToday && timeUpper.contains("TODAY"))
+                        }.map { ev ->
+                            val timePart = if (ev.localTime.contains(",")) ev.localTime.substringAfter(",").trim() else ev.localTime
+                            val formattedTime = if (activeDayObject.isToday) "Today • $timePart" else "${activeDayObject.fullName} • $timePart"
+                            
+                            MyScheduleItem.WorkshopSession(
+                                id = ev.id,
+                                title = ev.title,
+                                hostName = ev.hostName,
+                                timeLabel = formattedTime,
+                                event = ev
+                            )
+                        }
                         
-                        val upcomingBookings = bookingsList.filter { it.status == "Upcoming" || it.status == "Joined" }
-                        if (upcomingBookings.isEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .background(Color(0xFFFAFAFA), RoundedCornerShape(12.dp))
-                                    .padding(10.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("📅", fontSize = 20.sp)
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "No upcoming tutoring sessions booked.",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.Gray
-                                    )
-                                    Text(
-                                        text = "Schedule a slot with an expert below!",
-                                        fontSize = 9.sp,
-                                        color = Color.Gray
-                                    )
-                                }
+                        dayBookings + dayEvents
+                    }
+
+                    val totalSessions = sessionsForSelectedDay.size
+                    if (totalSessions == 0) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFFFAFAFA), RoundedCornerShape(20.dp))
+                                .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(20.dp))
+                                .padding(vertical = 20.dp, horizontal = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("📭", fontSize = 24.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "No sessions scheduled for this day.",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Gray
+                                )
                             }
-                        } else {
-                            upcomingBookings.take(3).forEach { item ->
-                                val matchedExpert = experts.find { it.id == item.expertId }
-                                val topicLower = (matchedExpert?.topic ?: "").lowercase()
-                                
-                                val (borderColor, emoji, displayTopic) = when {
-                                    topicLower.contains("math") -> Triple(Color(0xFFAED6F1), "📐", matchedExpert?.topic ?: "Mathematics")
-                                    topicLower.contains("garden") || topicLower.contains("plant") -> Triple(Color(0xFFA9DFBF), "🌳", matchedExpert?.topic ?: "Gardening")
-                                    topicLower.contains("financ") || topicLower.contains("money") || topicLower.contains("tax") -> Triple(Color(0xFFF9E79F), "💰", matchedExpert?.topic ?: "Finance")
-                                    topicLower.contains("well") || topicLower.contains("yoga") || topicLower.contains("health") -> Triple(Color(0xFFD7BDE2), "🧘", matchedExpert?.topic ?: "Wellness")
-                                    topicLower.contains("legal") || topicLower.contains("law") -> Triple(Color(0xFFFAD7A0), "⚖️", matchedExpert?.topic ?: "Legal")
-                                    else -> Triple(Color(0xFFD5D8DC), "🗓️", matchedExpert?.topic ?: "1:1 Session")
+                        }
+                    } else {
+                        val safeIndex = if (currentSessionIndex >= totalSessions) 0 else currentSessionIndex
+                        val activeSession = sessionsForSelectedDay.getOrNull(safeIndex)
+
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (totalSessions > 1) {
+                                    IconButton(
+                                        onClick = {
+                                            currentSessionIndex = (safeIndex - 1 + totalSessions) % totalSessions
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.KeyboardArrowLeft,
+                                            contentDescription = "Prev Session",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
                                 }
 
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(bottom = 4.dp)
-                                        .shadow(
-                                            elevation = 1.dp,
-                                            shape = RoundedCornerShape(10.dp),
-                                            clip = false
-                                        )
-                                        .background(
-                                            color = Color(0xFFFAFAFA),
-                                            shape = RoundedCornerShape(10.dp)
-                                        )
-                                        .drawBehind {
-                                            val strokeWidthPx = 3.dp.toPx()
-                                            drawLine(
-                                                color = borderColor,
-                                                start = Offset(strokeWidthPx / 2f, 0f),
-                                                end = Offset(strokeWidthPx / 2f, this.size.height),
-                                                strokeWidth = strokeWidthPx
-                                            )
-                                        }
-                                        .clickable { viewModel.setEditingBooking(item) }
-                                        .testTag("home_upcoming_session_${item.id}")
-                                ) {
-                                    Row(
+                                activeSession?.let { session ->
+                                    val nameForAvatar = when (session) {
+                                        is MyScheduleItem.TutoringSession -> session.mentorName
+                                        is MyScheduleItem.WorkshopSession -> session.hostName
+                                    }
+
+                                    val topicL = when (session) {
+                                        is MyScheduleItem.TutoringSession -> session.topic.lowercase()
+                                        is MyScheduleItem.WorkshopSession -> session.title.lowercase()
+                                    }
+
+                                    // Custom visual settings based on categories
+                                    val categoryText: String
+                                    val categoryEmoji: String
+                                    val cardBgColor: Color
+                                    val borderHighlightColor: Color
+                                    val categoryColor: Color
+
+                                    if (topicL.contains("garden") || topicL.contains("plant")) {
+                                        categoryText = "Gardening"
+                                        categoryEmoji = "🌱"
+                                        cardBgColor = Color(0xFFE8F5E9)      // Soft pastel green
+                                        borderHighlightColor = Color(0xFFA5D6A7)
+                                        categoryColor = Color(0xFF2E7D32)
+                                    } else if (topicL.contains("music") || topicL.contains("singing") || topicL.contains("instrument") || topicL.contains("vocal") || topicL.contains("song")) {
+                                        categoryText = "Music"
+                                        categoryEmoji = "🎵"
+                                        cardBgColor = Color(0xFFFFFDE7)      // Soft pastel yellow/amber
+                                        borderHighlightColor = Color(0xFFFFF59D)
+                                        categoryColor = Color(0xFFF57F17)
+                                    } else if (topicL.contains("recip") || topicL.contains("cook") || topicL.contains("traditional") || topicL.contains("cuisine") || topicL.contains("food")) {
+                                        categoryText = "Recipes"
+                                        categoryEmoji = "🍲"
+                                        cardBgColor = Color(0xFFFFF3E0)      // Soft pastel orange
+                                        borderHighlightColor = Color(0xFFFFCC80)
+                                        categoryColor = Color(0xFFE65100)
+                                    } else if (topicL.contains("stori") || topicL.contains("shloka") || topicL.contains("wisdom") || topicL.contains("epic") || topicL.contains("folklore")) {
+                                        categoryText = "Stories"
+                                        categoryEmoji = "📖"
+                                        cardBgColor = Color(0xFFEFEBE9)      // Soft pastel beige/brown
+                                        borderHighlightColor = Color(0xFFD7CCC8)
+                                        categoryColor = Color(0xFF5D4037)
+                                    } else {
+                                        categoryText = "Learn & Grow"
+                                        categoryEmoji = "📚"
+                                        cardBgColor = Color(0xFFF3E5F5)      // Soft lavender/purple
+                                        borderHighlightColor = Color(0xFFE1BEE7)
+                                        categoryColor = Color(0xFF6A1B9A)
+                                    }
+
+                                    // REDESIGNED HERO APPOINTMENT CARD (Perfect middle ground height: 116dp)
+                                    Box(
                                         modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                            .weight(1f)
+                                            .height(116.dp)
+                                            .shadow(3.dp, RoundedCornerShape(18.dp))
+                                            .background(
+                                                Brush.linearGradient(
+                                                    colors = listOf(cardBgColor, cardBgColor.copy(alpha = 0.9f))
+                                                ),
+                                                shape = RoundedCornerShape(18.dp)
+                                            )
+                                            .border(1.dp, borderHighlightColor.copy(alpha = 0.4f), RoundedCornerShape(18.dp))
+                                            .padding(horizontal = 12.dp, vertical = 8.dp)
                                     ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(28.dp)
-                                                .background(borderColor.copy(alpha = 0.2f), CircleShape),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(emoji, fontSize = 14.sp)
-                                        }
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(
-                                                    text = if (displayTopic.contains("Session")) displayTopic else "$displayTopic Refresher Session",
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.onSurface
-                                                )
-                                                if (item.status == "Joined") {
-                                                    Spacer(modifier = Modifier.width(4.dp))
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .size(6.dp)
-                                                            .background(Color(0xFF4CAF50), CircleShape)
-                                                    )
-                                                }
-                                            }
-                                            Text(
-                                                text = formatTimingWithDate(item.timing),
-                                                fontSize = 10.sp,
-                                                color = Color.Gray
-                                            )
-                                            Text(
-                                                text = "Mentor: ${item.expertName} (${item.durationMinutes}m • ${if (item.isVideo) "Video" else "Voice"})",
-                                                fontSize = 10.sp,
-                                                color = Color(0xFF8B1A1A),
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
                                         Row(
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            modifier = Modifier.fillMaxSize(),
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            OutlinedButton(
-                                                onClick = { viewModel.setEditingBooking(item) },
-                                                shape = RoundedCornerShape(6.dp),
-                                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-                                                colors = ButtonDefaults.outlinedButtonColors(
-                                                    contentColor = MaterialTheme.colorScheme.primary
-                                                ),
-                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
-                                                modifier = Modifier.height(24.dp).testTag("home_upcoming_modify_${item.id}")
+                                            // Left portion: 48-52dp circular expert profile, with bottom-end category emoji badge
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(52.dp)
+                                                    .align(Alignment.CenterVertically)
                                             ) {
-                                                Text("Modify", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                AvatarImage(
+                                                    name = nameForAvatar,
+                                                    size = 50,
+                                                    modifier = Modifier
+                                                        .size(50.dp)
+                                                        .shadow(1.5.dp, CircleShape)
+                                                        .border(1.2.dp, borderHighlightColor, CircleShape)
+                                                )
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(18.dp)
+                                                        .align(Alignment.BottomEnd)
+                                                        .background(Color.White, CircleShape)
+                                                        .border(1.dp, borderHighlightColor, CircleShape),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(categoryEmoji, fontSize = 10.sp)
+                                                }
                                             }
 
-                                            val isJoinedState = item.status == "Joined"
-                                            Button(
-                                                onClick = { 
-                                                    viewModel.joinBooking(item.id)
-                                                },
-                                                shape = RoundedCornerShape(6.dp),
-                                                colors = ButtonDefaults.buttonColors(
-                                                    containerColor = if (isJoinedState) Color(0xFF2E7D32) else Color(0xFF8B1A1A),
-                                                    contentColor = Color.White
-                                                ),
-                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
-                                                modifier = Modifier.height(24.dp).testTag("home_upcoming_join_${item.id}")
+                                            // Right portion: Redesigned hierarchy details
+                                            Column(
+                                                modifier = Modifier.weight(1f),
+                                                verticalArrangement = Arrangement.spacedBy(1.dp)
                                             ) {
-                                                Text(if (isJoinedState) "Joined ✓" else "Join Class", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                // Category Emoji + Category Name
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Text(categoryEmoji, fontSize = 10.sp)
+                                                    Text(
+                                                        text = categoryText,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = categoryColor
+                                                    )
+                                                }
+
+                                                // Session Title
+                                                val sessionTitle = when (session) {
+                                                    is MyScheduleItem.TutoringSession -> session.topic
+                                                    is MyScheduleItem.WorkshopSession -> session.title
+                                                }
+                                                Text(
+                                                    text = sessionTitle,
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = Color(0xFF1C2833),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+
+                                                // Hosted by Mentor Name (Dedicated line)
+                                                val sessionHost = when (session) {
+                                                    is MyScheduleItem.TutoringSession -> "Hosted by ${session.mentorName}"
+                                                    is MyScheduleItem.WorkshopSession -> "Hosted by ${session.hostName}"
+                                                }
+                                                Text(
+                                                    text = sessionHost,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.Gray.copy(alpha = 0.9f),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+
+                                                // Date and Time
+                                                Text(
+                                                    text = session.timeLabel,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+
+                                                Spacer(modifier = Modifier.height(1.dp))
+
+                                                // Message and Join Actions with increased spacing
+                                                Row(
+                                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Surface(
+                                                        onClick = {
+                                                            when (session) {
+                                                                is MyScheduleItem.TutoringSession -> {
+                                                                    viewModel.selectDirectConversation(session.expertId)
+                                                                    viewModel.selectTab(AppTab.Messages)
+                                                                }
+                                                                is MyScheduleItem.WorkshopSession -> {
+                                                                    viewModel.selectDirectConversation(null)
+                                                                    viewModel.selectTab(AppTab.Messages)
+                                                                }
+                                                            }
+                                                        },
+                                                        shape = RoundedCornerShape(14.dp),
+                                                        color = Color.White.copy(alpha = 0.75f),
+                                                        border = BorderStroke(1.dp, borderHighlightColor),
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .height(34.dp)
+                                                            .testTag("schedule_message_action")
+                                                    ) {
+                                                        Row(
+                                                            modifier = Modifier.fillMaxSize(),
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.Center
+                                                        ) {
+                                                            Text("💬", fontSize = 11.sp)
+                                                            Spacer(modifier = Modifier.width(6.dp))
+                                                            Text(
+                                                                "Message",
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = MaterialTheme.colorScheme.primary
+                                                            )
+                                                        }
+                                                    }
+
+                                                    Surface(
+                                                        onClick = {
+                                                            when (session) {
+                                                                is MyScheduleItem.TutoringSession -> {
+                                                                    viewModel.joinBooking(session.booking.id)
+                                                                    activeSubFeatureToast = "Connecting to the live session with ${session.mentorName}..."
+                                                                }
+                                                                is MyScheduleItem.WorkshopSession -> {
+                                                                    activeSubFeatureToast = "Connecting to the live circle workshop: ${session.title}..."
+                                                                }
+                                                            }
+                                                        },
+                                                        shape = RoundedCornerShape(14.dp),
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .height(34.dp)
+                                                            .testTag("schedule_join_action")
+                                                    ) {
+                                                        Row(
+                                                            modifier = Modifier.fillMaxSize(),
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            horizontalArrangement = Arrangement.Center
+                                                        ) {
+                                                            Text("🎥", fontSize = 11.sp)
+                                                            Spacer(modifier = Modifier.width(6.dp))
+                                                            Text(
+                                                                "Join",
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = Color.White
+                                                            )
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
+                                    }
+                                }
+
+                                if (totalSessions > 1) {
+                                    IconButton(
+                                        onClick = {
+                                            currentSessionIndex = (safeIndex + 1) % totalSessions
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.KeyboardArrowRight,
+                                            contentDescription = "Next Session",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (totalSessions > 1) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    (0 until totalSessions).forEach { dotIdx ->
+                                        val isCurrentDot = dotIdx == safeIndex
+                                        Box(
+                                            modifier = Modifier
+                                                .padding(horizontal = 2.5.dp)
+                                                .size(if (isCurrentDot) 6.dp else 4.dp)
+                                                .background(
+                                                    color = if (isCurrentDot) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.4f),
+                                                    shape = CircleShape
+                                                )
+                                        )
                                     }
                                 }
                             }
@@ -2908,8 +3277,8 @@ fun HomeDashboardScreen(
                 }
             }
 
-            // ITEM 6: Beautifully integrated calendar section (My Week Calendar)
-            item {
+            // ITEM 6: Beautifully integrated calendar section (My Week Calendar) - Removed to avoid duplicate widgets
+            if (false) item {
                 Column(modifier = Modifier.padding(top = 12.dp)) {
                     Text(
                         text = "My Week Calendar 🗓️",
@@ -7752,11 +8121,11 @@ fun LearnAndMentorScreen(
                                 expert.bio.contains(searchQuery, ignoreCase = true) ||
                                 expert.skillsTags.any { it.contains(searchQuery, ignoreCase = true) }
                         
-                        val matchesEmoji = selectedEmojiFilter == null || expert.category == selectedEmojiFilter
+                        val matchesEmoji = selectedEmojiFilter == null || selectedEmojiFilter in expert.tags
                         
                         val matchesLanguage = selectedLanguageFilter == "All" || expert.languages.contains(selectedLanguageFilter)
                         
-                        val matchesCategory = selectedCategoryFilter == "All" || expert.category == selectedCategoryFilter
+                        val matchesCategory = selectedCategoryFilter == "All" || selectedCategoryFilter in expert.tags
                         
                         val matchesVerified = !selectVerifiedOnly || expert.isVerifiedExpert
                         
@@ -9363,10 +9732,31 @@ fun ConnectActionDialog(
         text = {
             when (currentStepType) {
                 "Book" -> {
-                    var selectedDate by remember { mutableStateOf("Tomorrow (June 6)") }
-                    var selectedTime by remember { mutableStateOf("3:30 PM") }
+                    val today = remember { java.time.LocalDate.now() }
+                    val dynamicDates = remember(today) {
+                        (0..6).map { offset ->
+                            val date = today.plusDays(offset.toLong())
+                            val dayOfWeekShort = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()).uppercase()
+                            val label = if (offset == 0) "Today" else if (offset == 1) "Tomorrow" else date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())
+                            val dateDisplay = "${date.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()).take(3)} ${date.dayOfMonth}"
+                            Triple(dayOfWeekShort, label, dateDisplay)
+                        }
+                    }
+                    var selectedDateIdx by remember { mutableStateOf(1) } // Default to Tomorrow
+                    var selectedTime by remember { mutableStateOf("04:00 PM") }
                     var selectedDuration by remember { mutableStateOf(30) }
                     var isVideoSession by remember { mutableStateOf(false) }
+
+                    val timeMapping = remember {
+                        mapOf(
+                            "10:00 AM" to "10:30 AM",
+                            "11:30 AM" to "12:00 PM",
+                            "03:00 PM" to "03:30 PM",
+                            "04:00 PM" to "04:30 PM",
+                            "05:00 PM" to "05:30 PM",
+                            "06:30 PM" to "07:00 PM"
+                        )
+                    }
 
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
@@ -9392,23 +9782,23 @@ fun ConnectActionDialog(
 
                         // 1. DATE PICKER
                         Text("1. Select Date", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
-                        val dateOptions = listOf("Tomorrow (June 6)", "Fri, June 7", "Sat, June 8", "Sun, June 9", "Mon, June 10")
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            items(dateOptions) { date ->
-                                val isChosen = selectedDate == date
+                            items(dynamicDates.size) { index ->
+                                val dateInfo = dynamicDates[index]
+                                val isChosen = selectedDateIdx == index
                                 Surface(
                                     shape = RoundedCornerShape(10.dp),
                                     border = BorderStroke(1.5.dp, if (isChosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
                                     color = if (isChosen) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
                                     modifier = Modifier
-                                        .clickable { selectedDate = date }
+                                        .clickable { selectedDateIdx = index }
                                 ) {
                                     Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text(date.substringBefore(",").substringBefore("(").trim(), fontSize = 11.sp, color = if (isChosen) MaterialTheme.colorScheme.primary else Color.Gray, fontWeight = FontWeight.Bold)
-                                        Text(if (date.contains("(")) "June 6" else date.substringAfter(",").trim(), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                                        Text(dateInfo.second, fontSize = 11.sp, color = if (isChosen) MaterialTheme.colorScheme.primary else Color.Gray, fontWeight = FontWeight.Bold)
+                                        Text(dateInfo.third, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
                                     }
                                 }
                             }
@@ -9416,7 +9806,7 @@ fun ConnectActionDialog(
 
                         // 2. TIME SLOT PICKER
                         Text("2. Select Time Slot", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
-                        val timeOptions = listOf("10:30 AM", "11:00 AM", "3:30 PM", "4:00 PM", "5:30 PM")
+                        val timeOptions = listOf("10:00 AM", "11:30 AM", "03:00 PM", "04:00 PM", "05:00 PM", "06:30 PM")
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxWidth()
@@ -9513,7 +9903,12 @@ fun ConnectActionDialog(
                             }
 
                             Button(
-                                onClick = { onConfirmBooking("$selectedDate at $selectedTime", selectedDuration, isVideoSession) },
+                                onClick = {
+                                    val dateInfo = dynamicDates[selectedDateIdx]
+                                    val finalEndTime = timeMapping[selectedTime] ?: "10:30 AM"
+                                    val finalTiming = "${dateInfo.first} • $selectedTime - $finalEndTime"
+                                    onConfirmBooking(finalTiming, selectedDuration, isVideoSession)
+                                },
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.weight(1.5f).testTag("confirm_booking_btn")
                             ) {
@@ -13265,6 +13660,7 @@ fun CategoryDetailScreen(
     var viewModeState by remember { mutableStateOf("compact") } // "compact", "detailed", "ai_match"
     var discoveryFilterState by remember { mutableStateOf("All Experts") }
     var bookingExpertForSlotsDialog by remember { mutableStateOf<Expert?>(null) }
+    var bookingSuccessDataForDetail by remember { mutableStateOf<BookingConfirmationData?>(null) }
     var showAllExperts by remember { mutableStateOf(false) }
 
     val listState = rememberLazyListState()
@@ -13288,29 +13684,29 @@ fun CategoryDetailScreen(
 
     // Dynamic Filter Chips for subcategories depending on the category selected
     val filterChips = when (category.name.uppercase()) {
-        "LEARN & GROW", "LEARN AND GROW" -> listOf("All", "Maths", "Science", "Languages", "Finance", "Legal")
-        "HEALTH & WELLNESS" -> listOf("All", "Wellness")
-        "RECIPES & TRADITIONS", "RECIPES AND TRADITIONS" -> listOf("All", "Wellness")
-        "ARTS, MUSIC & CULTURE", "ARTS & CULTURE", "ARTS, MUSIC AND CULTURE" -> listOf("All", "Music")
-        "STORIES & HERITAGE", "STORIES AND HERITAGE" -> listOf("All", "Languages")
-        "NATURE & LIFESTYLE", "NATURE AND LIFESTYLE" -> listOf("All", "Gardening")
+        "LEARN & GROW", "LEARN AND GROW" -> listOf("All", "Maths", "Science", "Technology", "STEM", "Languages", "Banking", "Sanskrit", "Finance", "Legal")
+        "HEALTH & WELLNESS" -> listOf("All", "Wellness", "Counselling", "Physiotherapy", "Meditation", "Nutrition")
+        "RECIPES & TRADITIONS", "RECIPES AND TRADITIONS" -> listOf("All", "Wellness", "Cooking")
+        "ARTS, MUSIC & CULTURE", "ARTS & CULTURE", "ARTS, MUSIC AND CULTURE" -> listOf("All", "Music", "Bharatanatyam", "Veena", "Violin", "Vocal Music", "Bhajans", "Traditional Arts")
+        "STORIES & HERITAGE", "STORIES AND HERITAGE" -> listOf("All", "Languages", "Sanskrit", "Ramayana")
+        "NATURE & LIFESTYLE", "NATURE AND LIFESTYLE" -> listOf("All", "Gardening", "Terrace Gardening", "Organic Farming", "Cooking")
         else -> listOf("All")
     }
 
     val matchesFilter: (Expert, String) -> Boolean = { expert, filter ->
         if (filter == "All") true
-        else expert.topic == filter.lowercase()
+        else filter in expert.tags
     }
 
     // Filtered experts relevant to this category name, AND further filtered by subcategory chip instantly
     val filteredExperts = experts.filter { expert ->
         val belongsToCategory = when (category.name.uppercase()) {
-            "LEARN & GROW", "LEARN AND GROW" -> expert.topic in listOf("maths", "science", "languages", "finance", "legal")
-            "HEALTH & WELLNESS" -> expert.topic == "wellness"
-            "RECIPES & TRADITIONS", "RECIPES AND TRADITIONS" -> expert.topic == "wellness"
-            "ARTS, MUSIC & CULTURE", "ARTS & CULTURE", "ARTS, MUSIC AND CULTURE" -> expert.topic == "music"
-            "STORIES & HERITAGE", "STORIES AND HERITAGE" -> expert.topic == "languages"
-            "NATURE & LIFESTYLE", "NATURE AND LIFESTYLE" -> expert.topic == "gardening"
+            "LEARN & GROW", "LEARN AND GROW" -> expert.category == "LEARN & GROW" || expert.topic in listOf("maths", "science", "languages", "finance", "legal", "banking", "sanskrit")
+            "HEALTH & WELLNESS" -> expert.category == "HEALTH & WELLNESS" || expert.topic in listOf("wellness", "counselling", "physiotherapy", "meditation", "nutrition")
+            "RECIPES & TRADITIONS", "RECIPES AND TRADITIONS" -> expert.category == "HEALTH & WELLNESS" || expert.category == "NATURE & LIFESTYLE" || expert.topic in listOf("wellness", "cooking")
+            "ARTS, MUSIC & CULTURE", "ARTS & CULTURE", "ARTS, MUSIC AND CULTURE" -> expert.category == "ARTS, MUSIC & CULTURE" || expert.topic in listOf("music", "bharatanatyam", "veena", "violin", "vocal music", "bhajans", "traditional arts")
+            "STORIES & HERITAGE", "STORIES AND HERITAGE" -> expert.category == "STORIES & HERITAGE" || expert.category == "LEARN & GROW" || expert.topic in listOf("languages", "sanskrit", "ramayana")
+            "NATURE & LIFESTYLE", "NATURE AND LIFESTYLE" -> expert.category == "NATURE & LIFESTYLE" || expert.topic in listOf("gardening", "terrace gardening", "organic farming", "cooking")
             else -> true
         }
         belongsToCategory && matchesFilter(expert, selectedFilterChip)
@@ -14303,12 +14699,21 @@ fun CategoryDetailScreen(
                                         expertId = expert.id,
                                         selectedTime = slotTiming,
                                         onComplete = {
-                                            // Write success toast message instantly
-                                            android.widget.Toast.makeText(
-                                                context,
-                                                "Session booked with ${expert.name}!",
-                                                android.widget.Toast.LENGTH_LONG
-                                            ).show()
+                                            bookingSuccessDataForDetail = BookingConfirmationData(
+                                                expertName = expert.name,
+                                                title = expert.title,
+                                                timing = slotTiming,
+                                                category = expert.category,
+                                                emoji = when (expert.category.uppercase()) {
+                                                    "LEARN & GROW" -> "📚"
+                                                    "HEALTH & WELLNESS" -> "🌿"
+                                                    "ARTS, MUSIC & CULTURE" -> "🎨"
+                                                    "NATURE & LIFESTYLE" -> "🌱"
+                                                    else -> "📚"
+                                                },
+                                                isReschedule = false,
+                                                expertId = expert.id
+                                            )
                                             
                                             // Close bottom sheet
                                             bookingExpertForSlotsDialog = null
@@ -14363,6 +14768,152 @@ fun CategoryDetailScreen(
                 },
                 shape = RoundedCornerShape(20.dp)
             )
+        }
+
+        bookingSuccessDataForDetail?.let { successData ->
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = { bookingSuccessDataForDetail = null },
+                properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .whiteCardShadow()
+                            .background(Color.White, RoundedCornerShape(26.dp))
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .background(Color(0xFFE8F8F5), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("✅", fontSize = 36.sp)
+                        }
+
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        Text(
+                            text = "Session Booked Successfully",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF2E7D32)
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFFFBF8FC), RoundedCornerShape(18.dp))
+                                .border(1.dp, Color(0xFFEADCF8).copy(alpha = 0.5f), RoundedCornerShape(18.dp))
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "Instructor: ${successData.expertName}",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.Black
+                            )
+                            Text(
+                                text = successData.title,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Text(
+                                text = successData.timing,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color(0xFF8B1A1A)
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Box(
+                                modifier = Modifier
+                                    .background(Color(0xFFF5EEF8), RoundedCornerShape(12.dp))
+                                    .border(1.dp, Color(0xFFE8DAEF), RoundedCornerShape(12.dp))
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = "${successData.emoji} ${successData.category}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF7D3C98)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(26.dp))
+
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    bookingSuccessDataForDetail = null
+                                    viewModel.openScheduler("common_calendar")
+                                },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B1A1A)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .testTag("alert_success_view_calendar")
+                            ) {
+                                Text("View In Calendar", fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+
+                            Button(
+                                onClick = {
+                                    bookingSuccessDataForDetail = null
+                                    val dayAndMonth = successData.timing.substringBefore(" • ").trim()
+                                    val timePart = successData.timing.substringAfter(" • ").trim().substringBefore(" - ").trim()
+                                    val starterMsg = "Hello ${successData.expertName}, I have booked a session with you on $dayAndMonth at $timePart. Looking forward to meeting you."
+                                    viewModel.startDirectChat(successData.expertId, starterMsg)
+                                },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4A4A4A)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .testTag("alert_success_message_teacher")
+                            ) {
+                                Text("Message Teacher", fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    bookingSuccessDataForDetail = null
+                                },
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.2.dp, Color.Gray.copy(alpha = 0.5f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .testTag("alert_success_done")
+                            ) {
+                                Text("Done", fontWeight = FontWeight.Bold, color = Color.DarkGray)
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Sticky collapsing glassmorphic header
@@ -15204,7 +15755,8 @@ fun SubcategoryDetailScreen(
 fun EventDetailScreen(
     event: CommunityEvent,
     onBack: () -> Unit,
-    onHostClick: (String) -> Unit
+    onHostClick: (String) -> Unit,
+    onNavigateToCalendar: () -> Unit
 ) {
     var userRsvpedState by remember { mutableStateOf(event.isUserRsvped) }
     var rsvpsCountState by remember { mutableStateOf(event.rsvpCount) }
@@ -15516,13 +16068,26 @@ fun EventDetailScreen(
     }
 
     if (detailsNotificationToast != null) {
+        val toastText = detailsNotificationToast!!
         AlertDialog(
             onDismissRequest = { detailsNotificationToast = null },
             title = { Text("RSVP Status 🎉", fontWeight = FontWeight.Bold) },
-            text = { Text(detailsNotificationToast!!) },
+            text = { Text(toastText) },
             confirmButton = {
                 TextButton(onClick = { detailsNotificationToast = null }) {
                     Text("Awesome", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                if (toastText.contains("Successfully RSVPed")) {
+                    TextButton(
+                        onClick = {
+                            detailsNotificationToast = null
+                            onNavigateToCalendar()
+                        }
+                    ) {
+                        Text("Take Me to Calendar 🗓️", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    }
                 }
             }
         )
@@ -15538,8 +16103,18 @@ fun PremiumBookingCalendarScreen(
 ) {
     val experts by viewModel.experts.collectAsState()
     val bookingsList by viewModel.bookingsList.collectAsState()
+    val events by viewModel.events.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
     val isTeacherMode = currentUser.userRoleType == "Teach"
+
+    fun getEventsForDay(day: CalendarDay, allEvents: List<CommunityEvent>): List<CommunityEvent> {
+        return allEvents.filter { event ->
+            val timeString = event.localTime.lowercase()
+            val matchToday = day.isToday && (timeString.contains("today") || timeString.contains(day.fullName.lowercase()) || timeString.contains(day.key.lowercase()))
+            val matchDayName = timeString.contains(day.fullName.lowercase()) || timeString.contains(day.key.lowercase())
+            matchToday || matchDayName
+        }
+    }
     
     val expert = experts.find { it.id == expertId }
     
@@ -15592,6 +16167,7 @@ fun PremiumBookingCalendarScreen(
     var showBookingConfirmationBySlot by remember { mutableStateOf<String?>(null) }
     var blockedSlots by remember { mutableStateOf(setOf<String>()) } // Format: "WED • 10:00 AM - 10:30 AM"
     var bookingSuccessData by remember { mutableStateOf<BookingConfirmationData?>(null) }
+    var selectedExpertForProfileState by remember { mutableStateOf<Expert?>(null) }
 
     Box(
         modifier = Modifier
@@ -15646,13 +16222,13 @@ fun PremiumBookingCalendarScreen(
                         
                         Column {
                             Text(
-                                text = if (rescheduleBookingId != null) "Reschedule Workspace" else "Premium Tutoring Intake",
+                                text = if (rescheduleBookingId != null) "Reschedule Workspace" else if (expertId == "common_calendar") "Wisdom Class Calendar" else "Class Calendar",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = Color.Black
                             )
                             Text(
-                                text = "1:1 Live Interactive Classrooms",
+                                text = if (expertId == "common_calendar") "1:1 Classes & Live Workshops" else "1:1 Live Interactive Classrooms",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color.Gray,
                                 fontWeight = FontWeight.SemiBold
@@ -15778,15 +16354,54 @@ fun PremiumBookingCalendarScreen(
                         val slotTimeRange = "$startTime - $endTime"
                         val timingString = "$selectedDay • $slotTimeRange"
                         
-                        val matchingBooking = bookingsList.find { b ->
-                            b.expertId == expertId && b.timing == timingString
+                        val matchingEvent = events.find { ev ->
+                            getEventsForDay(calendarDays.find { it.key.uppercase() == selectedDay } ?: calendarDays[0], listOf(ev)).isNotEmpty() &&
+                            (ev.localTime.contains(startTime, ignoreCase = true) || ev.localTime.contains(startTime.replace(" ", ""), ignoreCase = true))
                         }
-                        val isBookedByYou = matchingBooking != null && matchingBooking.status == "Upcoming"
-                        val isBookedByPeer = !isBookedByYou && (index == 1 || index == 3)
-                        val isBlockedSlot = blockedSlots.contains(timingString)
+                        
+                        val matchingBooking = bookingsList.find { b -> 
+                            val bTiming = b.timing.uppercase()
+                            val isSameDay = bTiming.startsWith(selectedDay) || bTiming.contains(selectedDay)
+                            val timePart = bTiming.substringAfter("•").trim()
+                            val isSameTime = timePart.contains(startTime) || startTime.contains(timePart) || 
+                                             timePart.replace(" ", "").contains(startTime.replace(" ", "")) ||
+                                             startTime.replace(" ", "").contains(timePart.replace(" ", ""))
+                            val matchesExpert = (expertId == "common_calendar") || (b.expertId == expertId)
+                            isSameDay && isSameTime && matchesExpert
+                        }
+                        
+                        val isBookedByYou = (matchingBooking != null && (matchingBooking.status == "Upcoming" || matchingBooking.status == "confirmed" || matchingBooking.status == "Joined")) || (matchingEvent != null && matchingEvent.isUserRsvped)
+                        val isBookedByPeer = !isBookedByYou && (index == 1 || index == 3) && expertId != "common_calendar"
+                        val isBlockedSlot = blockedSlots.contains(timingString) && expertId != "common_calendar"
                         
                         val classDetails = tutoringOfferings[index % tutoringOfferings.size]
-                        val (className, classDesc, classIcon) = classDetails
+                        val (initialClassName, initialClassDesc, initialClassIcon) = classDetails
+
+                        val slotExpertId = when (index % 6) {
+                            0 -> "exp_seed_maths_1"
+                            1 -> "exp_seed_languages_0"
+                            2 -> "exp_seed_gardening_0"
+                            3 -> "exp_seed_science_1"
+                            4 -> "exp_seed_finance_1"
+                            else -> "exp_seed_music_0"
+                        }
+                        val slotCategoryExpert = experts.find { it.id == slotExpertId }
+                        
+                        val className = when {
+                            matchingEvent != null -> matchingEvent.title
+                            matchingBooking != null -> "${matchingBooking.expertName}'s 1:1 Session"
+                            else -> initialClassName
+                        }
+                        val classDesc = when {
+                            matchingEvent != null -> matchingEvent.description
+                            matchingBooking != null -> "Personal 1:1 session with tutor ${matchingBooking.expertName} in ${matchingBooking.expertName}'s primary expertise area."
+                            else -> initialClassDesc
+                        }
+                        val classIcon = when {
+                            matchingEvent != null -> "🎉"
+                            matchingBooking != null -> "👨‍🏫"
+                            else -> initialClassIcon
+                        }
 
                         Row(
                             modifier = Modifier
@@ -15860,11 +16475,17 @@ fun PremiumBookingCalendarScreen(
                                             // Handle teacher modes
                                         } else {
                                             if (!isBookedByPeer && !isBookedByYou && !isBlockedSlot) {
-                                                if (rescheduleBookingId != null) {
-                                                    viewModel.rescheduleBooking(rescheduleBookingId, timingString)
-                                                    alertMessage = "Your session was successfully rescheduled to $timingString!"
+                                                if (expertId == "common_calendar") {
+                                                    if (slotCategoryExpert != null) {
+                                                        selectedExpertForProfileState = slotCategoryExpert
+                                                    }
                                                 } else {
-                                                    showBookingConfirmationBySlot = timingString
+                                                    if (rescheduleBookingId != null) {
+                                                        viewModel.rescheduleBooking(rescheduleBookingId, timingString)
+                                                        alertMessage = "Your session was successfully rescheduled to $timingString!"
+                                                    } else {
+                                                        showBookingConfirmationBySlot = timingString
+                                                    }
                                                 }
                                             }
                                         }
@@ -15908,6 +16529,7 @@ fun PremiumBookingCalendarScreen(
                                                         isBookedByYou -> Color(0xFF2ECC71).copy(alpha = 0.15f)
                                                         isBookedByPeer -> Color.Gray.copy(alpha = 0.1f)
                                                         isBlockedSlot -> Color.Red.copy(alpha = 0.14f)
+                                                        matchingEvent != null -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                                                         else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
                                                     },
                                                     shape = RoundedCornerShape(10.dp)
@@ -15916,9 +16538,10 @@ fun PremiumBookingCalendarScreen(
                                         ) {
                                             Text(
                                                 text = when {
-                                                    isBookedByYou -> "✓ Appointed"
+                                                    isBookedByYou -> if (matchingEvent != null) "✓ Booked" else "✓ Appointed"
                                                     isBookedByPeer -> "Occupied"
                                                     isBlockedSlot -> "Unavailable"
+                                                    matchingEvent != null -> "Workshop"
                                                     else -> "Available"
                                                 },
                                                 fontSize = 9.sp,
@@ -15927,6 +16550,7 @@ fun PremiumBookingCalendarScreen(
                                                     isBookedByYou -> Color(0xFF27AE60)
                                                     isBookedByPeer -> Color.Gray
                                                     isBlockedSlot -> Color.Red
+                                                    matchingEvent != null -> MaterialTheme.colorScheme.primary
                                                     else -> MaterialTheme.colorScheme.primary
                                                 }
                                             )
@@ -15999,27 +16623,66 @@ fun PremiumBookingCalendarScreen(
                                         }
                                     } else {
                                         when {
-                                            isBookedByYou -> {
+                                            matchingEvent != null -> {
+                                                if (matchingEvent.isUserRsvped) {
+                                                    Button(
+                                                        onClick = { alertMessage = "Connecting to the live interactive video/audio workshop on Wisdom Bridge..." },
+                                                        shape = RoundedCornerShape(12.dp),
+                                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF27AE60)),
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .height(44.dp)
+                                                    ) {
+                                                        Text("Enter Workshop 📹", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                    }
+                                                } else {
+                                                    Button(
+                                                        onClick = { 
+                                                            viewModel.toggleEventRsvp(matchingEvent.id)
+                                                            bookingSuccessData = BookingConfirmationData(
+                                                                expertName = matchingEvent.hostName,
+                                                                title = matchingEvent.title,
+                                                                timing = matchingEvent.localTime,
+                                                                category = matchingEvent.communityName,
+                                                                emoji = "🎉",
+                                                                isReschedule = false
+                                                            )
+                                                        },
+                                                        shape = RoundedCornerShape(12.dp),
+                                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .height(44.dp)
+                                                    ) {
+                                                        Text("Book Workshop 🎟️", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                    }
+                                                }
+                                            }
+
+                                            matchingBooking != null -> {
                                                 Row(
                                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                                     modifier = Modifier.fillMaxWidth()
                                                 ) {
+                                                    val isJoinedState = matchingBooking.status == "Joined"
                                                     Button(
-                                                        onClick = { alertMessage = "Connecting secure Video classroom lesson call on Wisdom Bridge..." },
+                                                        onClick = { 
+                                                            viewModel.joinBooking(matchingBooking.id)
+                                                            alertMessage = "Joined classes successfully! Ready to learn."
+                                                        },
                                                         shape = RoundedCornerShape(12.dp),
-                                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF27AE60)),
+                                                        colors = ButtonDefaults.buttonColors(
+                                                            containerColor = if (isJoinedState) Color(0xFF2E7D32) else Color(0xFF8B1A1A)
+                                                        ),
                                                         modifier = Modifier
                                                             .weight(1.2f)
                                                             .height(44.dp)
                                                     ) {
-                                                        Text("Enter Class 📹", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                        Text(if (isJoinedState) "Joined ✓" else "Enter Class 📹", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                                     }
                                                     OutlinedButton(
                                                         onClick = {
-                                                            val bId = matchingBooking?.id
-                                                            if (bId != null) {
-                                                                viewModel.openScheduler(expertId, bId)
-                                                            }
+                                                            viewModel.openScheduler(matchingBooking.expertId, matchingBooking.id)
                                                         },
                                                         shape = RoundedCornerShape(12.dp),
                                                         modifier = Modifier
@@ -16054,40 +16717,67 @@ fun PremiumBookingCalendarScreen(
                                             }
 
                                             else -> {
-                                                Button(
-                                                    onClick = {
-                                                        if (rescheduleBookingId != null) {
-                                                            viewModel.rescheduleBooking(rescheduleBookingId, timingString, onComplete = {
-                                                                bookingSuccessData = BookingConfirmationData(
-                                                                    expertName = expert?.name ?: "Mentor",
-                                                                    title = expert?.title ?: "Expert Guide",
-                                                                    timing = timingString,
-                                                                    category = expert?.category ?: "LEARN & GROW",
-                                                                    emoji = when (expert?.category?.uppercase()) {
-                                                                        "LEARN & GROW" -> "📚"
-                                                                        "HEALTH & WELLNESS" -> "🌿"
-                                                                        "ARTS, MUSIC & CULTURE" -> "🎨"
-                                                                        "NATURE & LIFESTYLE" -> "🌱"
-                                                                        else -> "📚"
-                                                                    },
-                                                                    isReschedule = true
-                                                                )
-                                                            })
-                                                        } else {
-                                                            showBookingConfirmationBySlot = timingString
-                                                        }
-                                                    },
-                                                    shape = RoundedCornerShape(12.dp),
-                                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .height(44.dp)
-                                                ) {
-                                                    Text(
-                                                        text = if (rescheduleBookingId != null) "Confirm Reschedule Slot" else "Instant Live Booking • ₹299",
-                                                        fontSize = 11.5.sp,
-                                                        fontWeight = FontWeight.ExtraBold
-                                                    )
+                                                if (expertId == "common_calendar") {
+                                                    OutlinedButton(
+                                                        onClick = {
+                                                            if (slotCategoryExpert != null) {
+                                                                selectedExpertForProfileState = slotCategoryExpert
+                                                            }
+                                                        },
+                                                        shape = RoundedCornerShape(12.dp),
+                                                        border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.primary),
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .height(44.dp)
+                                                    ) {
+                                                        Text("Book 1:1 Slot with Mentor 📚", fontSize = 11.5.sp, fontWeight = FontWeight.ExtraBold)
+                                                    }
+                                                } else {
+                                                    if (rescheduleBookingId != null) {
+                                                        Button(
+                                                            onClick = {
+                                                                if (rescheduleBookingId != null) {
+                                                                viewModel.rescheduleBooking(rescheduleBookingId, timingString, onComplete = {
+                                                                    bookingSuccessData = BookingConfirmationData(
+                                                                        expertName = expert?.name ?: "Mentor",
+                                                                        title = expert?.title ?: "Expert Guide",
+                                                                        timing = timingString,
+                                                                        category = expert?.category ?: "LEARN & GROW",
+                                                                        emoji = when (expert?.category?.uppercase()) {
+                                                                            "LEARN & GROW" -> "📚"
+                                                                            "HEALTH & WELLNESS" -> "🌿"
+                                                                            "ARTS, MUSIC & CULTURE" -> "🎨"
+                                                                            "NATURE & LIFESTYLE" -> "🌱"
+                                                                            else -> "📚"
+                                                                        },
+                                                                        isReschedule = true
+                                                                    )
+                                                                })
+                                                            } else {
+                                                                showBookingConfirmationBySlot = timingString
+                                                            }
+                                                        },
+                                                        shape = RoundedCornerShape(12.dp),
+                                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .height(44.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = "Confirm Reschedule Slot",
+                                                            fontSize = 11.5.sp,
+                                                            fontWeight = FontWeight.ExtraBold
+                                                        )
+                                                    }
+                                                    } else {
+                                                        Text(
+                                                            text = "💡 Tap 'Find Expert' on Home Screen to schedule from verified mentors.",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = Color.Gray,
+                                                            fontWeight = FontWeight.Medium,
+                                                            modifier = Modifier.padding(vertical = 4.dp)
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
@@ -16258,7 +16948,6 @@ fun PremiumBookingCalendarScreen(
                     Button(
                         onClick = {
                             bookingSuccessData = null
-                            onBack()
                         },
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B1A1A)),
@@ -16310,6 +16999,33 @@ fun PremiumBookingCalendarScreen(
                     }
                 }
             }
+        }
+
+        selectedExpertForProfileState?.let { expert ->
+            val followedExportIds by viewModel.followedExpertIds.collectAsState()
+            val isFollowed = followedExportIds.contains(expert.id)
+            val bookedSecondsFlow = viewModel.bookedSessionExpertIds.collectAsState()
+            val isBooked = bookedSecondsFlow.value.contains(expert.id)
+
+            WisdomProfileDetailView(
+                expert = expert,
+                isFollowed = isFollowed,
+                bookedTime = if (isBooked) "Booked!" else null,
+                privateQuestionsCount = 0,
+                onClose = { selectedExpertForProfileState = null },
+                onActionType = { type ->
+                    if (type == "Follow_Trigger") {
+                        viewModel.toggleFollowExpert(expert.id)
+                    } else if (type == "Book") {
+                        viewModel.openScheduler(expert.id)
+                        selectedExpertForProfileState = null
+                    } else {
+                        viewModel.startDirectChat(expert.id)
+                        selectedExpertForProfileState = null
+                    }
+                },
+                onFollowToggle = { viewModel.toggleFollowExpert(expert.id) }
+            )
         }
     }
 }

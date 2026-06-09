@@ -18,7 +18,8 @@ data class DbExpert(
     val availability: String,
     val rating: Double,
     val session_count: Int,
-    val avatar_seed: String
+    val avatar_seed: String,
+    val tags: String = ""
 )
 
 @Entity(tableName = "bookings")
@@ -150,7 +151,7 @@ interface ResponseDao {
         DbRequest::class,
         DbResponse::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AgeNoBarDatabase : RoomDatabase() {

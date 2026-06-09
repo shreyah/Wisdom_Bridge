@@ -197,6 +197,7 @@ data class Expert(
     val activeOfflineAvailability: String = "Weekdays 3 PM - 7 PM",
     val flatSessionFee: Int = 0, // 0 for free/swap
     val skillsTags: List<String> = emptyList(),
+    val tags: List<String> = emptyList(),
     val communityWall: List<CommunityWallPost> = emptyList(),
     val testimonialsList: List<Testimonial> = emptyList(),
     val questionsAnswered: Int = 24,

@@ -657,7 +657,7 @@ class AgeNoBarViewModel : ViewModel() {
                 isUserRsvped = false
             )
         )
-        _experts.value = loadDefaultExperts()
+        _experts.value = loadGeneratedExpertsForBridge()
     }
 
     // -- SIMULATE ACTIVE VOICE ROOM PEER WAVEPOWER & EMOJIS --
@@ -1689,7 +1689,10 @@ class AgeNoBarViewModel : ViewModel() {
                     rating = exp.rating,
                     session_count = exp.sessionsHosted,
                     avatar_seed = exp.avatarUrl,
-                    tags = exp.tags.joinToString(";")
+                    tags = exp.tags.joinToString(";"),
+                    category = exp.category,
+                    specialisation = exp.specialisation,
+                    specialisation_display = exp.specialisation_display
                 )
             }
             expertDaoSafe.insertExperts(dbExperts)
@@ -1892,70 +1895,68 @@ class AgeNoBarViewModel : ViewModel() {
 
     fun DbExpert.toExpert(): Expert {
         val topicLower = topic.lowercase()
+        val catId = if (category.isNotEmpty()) category else when(topicLower) {
+            "maths", "science", "languages", "finance", "legal", "banking", "sanskrit" -> "LEARN & GROW"
+            "wellness", "counselling", "physiotherapy", "meditation", "nutrition" -> "HEALTH & WELLNESS"
+            "music", "bharatanatyam", "veena", "violin", "vocal music", "bhajans", "traditional arts" -> "ARTS, MUSIC & CULTURE"
+            "gardening", "terrace gardening", "organic farming", "cooking" -> "NATURE & LIFESTYLE"
+            "ramayana" -> "STORIES & HERITAGE"
+            else -> "science"
+        }
+        val specId = if (specialisation.isNotEmpty()) specialisation else topicLower
+        val specDisplay = if (specialisation_display.isNotEmpty()) specialisation_display else when(topicLower) {
+            "maths" -> "Mathematics Mentor"
+            "science" -> "Science Instructor"
+            "languages" -> "Language Coach"
+            else -> "Specialist Mentor"
+        }
+
         return Expert(
             id = id,
             name = name,
-            title = when(topicLower) {
-                "maths" -> "Mathematics Mentor"
-                "science" -> "Science & Tech Instructor"
-                "languages" -> "Language Coach"
-                "finance" -> "Financial Advisor"
-                "wellness" -> "Ayurveda & Yoga Specialist"
-                "legal" -> "Legal Counselor"
-                "music" -> "Music Teacher"
-                "gardening" -> "Gardening Expert"
-                "bharatanatyam" -> "Classical Dance Acharya"
-                "veena" -> "Veena Vidwan / Vidushi"
-                "violin" -> "Carnatic Violin Maestro"
-                "vocal music" -> "Indian Classical Vocal Guru"
-                "bhajans" -> "Satsang & Bhajan Guide"
-                "terrace gardening" -> "Terrace Garden Designer"
-                "organic farming" -> "Organic Farming Consultant"
-                "banking" -> "Banking & Security Specialist"
-                "counselling" -> "Mental Health & Empathy Counselor"
-                "physiotherapy" -> "Senior Joint & Physiotherapy Specialist"
-                "meditation" -> "Dhyana & Mindfulness Guide"
-                "nutrition" -> "Diet & Lifestyle Consultant"
-                "cooking" -> "Traditional Culinary Guru"
-                "sanskrit" -> "Sanskrit Grammar & Sloka Scholar"
-                "ramayana" -> "Puranic & Ramayana Storyteller"
-                "traditional arts" -> "Heritage Art & Craft Mentor"
-                else -> "Specialist Mentor"
+            title = if (specialisation_display.isNotEmpty()) {
+                specialisation_display
+            } else {
+                when(topicLower) {
+                    "maths" -> "Mathematics Mentor"
+                    "science" -> "Science & Tech Instructor"
+                    "languages" -> "Language Coach"
+                    "finance" -> "Financial Advisor"
+                    "wellness" -> "Ayurveda & Yoga Specialist"
+                    "legal" -> "Legal Counselor"
+                    "music" -> "Music Teacher"
+                    "gardening" -> "Gardening Expert"
+                    "bharatanatyam" -> "Classical Dance Acharya"
+                    "veena" -> "Veena Vidwan / Vidushi"
+                    "violin" -> "Carnatic Violin Maestro"
+                    "vocal music" -> "Indian Classical Vocal Guru"
+                    "bhajans" -> "Satsang & Bhajan Guide"
+                    "terrace gardening" -> "Terrace Garden Designer"
+                    "organic farming" -> "Organic Farming Consultant"
+                    "banking" -> "Banking & Security Specialist"
+                    "counselling" -> "Mental Health & Empathy Counselor"
+                    "physiotherapy" -> "Senior Joint & Physiotherapy Specialist"
+                    "meditation" -> "Dhyana & Mindfulness Guide"
+                    "nutrition" -> "Diet & Lifestyle Consultant"
+                    "cooking" -> "Traditional Culinary Guru"
+                    "sanskrit" -> "Sanskrit Grammar & Sloka Scholar"
+                    "ramayana" -> "Puranic & Ramayana Storyteller"
+                    "traditional arts" -> "Heritage Art & Craft Mentor"
+                    else -> "Specialist Mentor"
+                }
             },
-            category = when(topicLower) {
-                "maths", "science", "languages", "finance", "legal", "banking", "sanskrit" -> "LEARN & GROW"
-                "wellness", "counselling", "physiotherapy", "meditation", "nutrition" -> "HEALTH & WELLNESS"
-                "music", "bharatanatyam", "veena", "violin", "vocal music", "bhajans", "traditional arts" -> "ARTS, MUSIC & CULTURE"
-                "gardening", "terrace gardening", "organic farming", "cooking" -> "NATURE & LIFESTYLE"
-                "ramayana" -> "STORIES & HERITAGE"
-                else -> "LEARN & GROW"
-            },
+            category = catId,
             yearsOfExperience = experience_years,
-            areaEmoji = when(topicLower) {
-                "maths" -> "📐"
+            areaEmoji = when(catId.lowercase()) {
                 "science" -> "🔬"
+                "maths" -> "📐"
                 "languages" -> "🗣️"
-                "finance" -> "🪙"
-                "wellness" -> "🧘"
-                "legal" -> "⚖️"
+                "career" -> "💼"
+                "banking_finance" -> "🏦"
+                "ayurveda" -> "🌿"
+                "dance" -> "💃"
                 "music" -> "🎵"
-                "gardening" -> "🌱"
-                "bharatanatyam" -> "💃"
-                "veena" -> "🪕"
-                "violin" -> "🎻"
-                "vocal music" -> "🎤"
-                "bhajans" -> "📿"
-                "terrace gardening" -> "🏡"
-                "organic farming" -> "🚜"
-                "banking" -> "🏦"
-                "counselling" -> "🤝"
                 "physiotherapy" -> "🦾"
-                "meditation" -> "🧘‍♀️"
-                "nutrition" -> "🍎"
-                "cooking" -> "🍳"
-                "sanskrit" -> "📜"
-                "ramayana" -> "📖"
-                "traditional arts" -> "🎨"
                 else -> "🎓"
             },
             languages = languages.split(";").map { it.trim() },
@@ -1964,13 +1965,13 @@ class AgeNoBarViewModel : ViewModel() {
             peopleHelpedCount = session_count * 2,
             avatarUrl = avatar_seed,
             bio = bio,
-            certificationStatus = "Verified Specialist",
-            introductionText = "Hi, I am $name. I specialize in $topic and look forward to our session!",
+            certificationStatus = "Certified $specDisplay",
+            introductionText = "Hi, I am $name. I specialize in $specDisplay and look forward to our session!",
             videoIntroductionUrl = "intro_video",
             myStoryText = bio,
             activeOfflineAvailability = availability,
             flatSessionFee = rate_per_30min,
-            skillsTags = listOf(topic, "Professional Mentorship", "1:1 Live Help"),
+            skillsTags = listOf(specId, "Professional Mentorship", "1:1 Live Help"),
             tags = tags.split(";").map { it.trim() }.filter { it.isNotEmpty() },
             communityWall = emptyList(),
             testimonialsList = listOf(
@@ -1982,7 +1983,9 @@ class AgeNoBarViewModel : ViewModel() {
             knowledgeLibraryResources = emptyList(),
             isVerifiedExpert = true,
             isOnlineNow = true,
-            topic = topicLower
+            topic = topicLower,
+            specialisation = specId,
+            specialisation_display = specDisplay
         )
     }
 
@@ -2650,445 +2653,237 @@ class AgeNoBarViewModel : ViewModel() {
     }
 
     // -- LOAD INITIAL SEED DATA FOR AGE NO BAR EXPERTS DIRECTORY --
-    private fun loadDefaultExperts(): List<Expert> {
-        return loadGeneratedExpertsForBridge()
-    }
-
     private fun loadGeneratedExpertsForBridge(): List<Expert> {
         val list = mutableListOf<Expert>()
         
-        // Define the 8 canonical categories with exactly 5 distinct sub-focuses
-        val categoriesData = listOf(
-            CategoryData(
-                category = "LEARN & GROW",
-                subExp = "Vedic Mathematics & Tutoring",
-                emoji = "📐",
-                fee = 199,
-                baseNames = listOf("Rajesh Sharma", "Lakshmi Rao", "Vipin Gupta", "Apurva Mehta", "S. Venkatrayan"),
-                titles = listOf("Retired School Math Teacher", "Mathematics Mentor", "Vedic Arithmetic Coach", "College Mathematics Professor", "Olympiad Math Advisor"),
-                bios = listOf(
-                    "Teaching school children Vedic math shortcuts for 35+ years.",
-                    "Making mathematics simple, interesting, and friendly for senior learning and grandchildren's schoolwork.",
-                    "Specialist in simple visual math tables, division tricks, and fun math games.",
-                    "University math professor ready to simplify basic arithmetic for school students.",
-                    "Olympiad level arithmetic mentor with 30 years coaching excellence."
-                ),
-                skills = listOf("Vedic Multiplication Trick", "Visual Division Systems", "High School Arithmetic", "Algebra Basic Models"),
-                avail = "Mon-Wed 3 PM - 5 PM",
-                story = "Passionate about dispelling math anxiety. AI Chachi says: 'Their math techniques are pure magic!'",
-                topic = "maths"
-            ),
-            CategoryData(
-                category = "LEARN & GROW",
-                subExp = "Science & Tech",
-                emoji = "🔬",
-                fee = 249,
-                baseNames = listOf("Savita Narang", "Satyendra Nath", "Jitendra Swarup", "Pradip Barua", "Prof. R. C. Bose"),
-                titles = listOf("Retired Professor of IT & Senior Systems Engineer", "Ex-ISRO Research Scientist", "Retired High School Physics Teacher", "STEM Experiential Educator", "Chemistry Lab Specialist"),
-                bios = listOf(
-                    "Helping seniors overcome smartphone anxiety, handle online password keys safely, and use video calls.",
-                    "Guiding schools kids in astronomy, basic mechanics, and amateur rocket builds.",
-                    "Simplifying complex physics chapters into easy household experiments.",
-                    "Making early STEM fun and engaging using recycled crafts and toys.",
-                    "Retired professor showing children electricity rules with safe basic kits."
-                ),
-                skills = listOf("High School Classical Physics", "Recycled Science Projects", "Aerodynamics Foundations", "Chemistry Made Fun"),
-                avail = "Tue-Thu 4 PM - 6 PM",
-                story = "Dedicated to building the next generation of scientific minds.",
-                topic = "science"
-            ),
-            CategoryData(
-                category = "LEARN & GROW",
-                subExp = "Languages",
-                emoji = "🗣️",
-                fee = 149,
-                baseNames = listOf("Acharya Shastri", "Devyani Parthasarathy", "Nirmala Sharma", "Kalluri Rao", "Prof. Ranjit Singh"),
-                titles = listOf("Sanskrit Grammar Scholar", "English Vocabulary & Phonetics Coach", "Hindi Literature & Poetry Advisor", "Linguistic Heritage Educator", "Conversational Folk Language Guide"),
-                bios = listOf(
-                    "Teaching Sanskrit chanting, correct pronunciation rules, and basic terms.",
-                    "Helping school pupils speak fluent, grammatical, and highly confident English.",
-                    "Traditional poetry writing guidelines and Hindi language school syllabus support.",
-                    "Promoting localized regional literature and ancient story-sharing norms.",
-                    "Interactive visual classes on conversational regional languages with zero stress."
-                ),
-                skills = listOf("Sanskrit Sloka Pronunciations", "Fluent English Accent Guide", "Hindi Verse Composition", "Syllabus Grammar Exercises"),
-                avail = "Daily 2 PM - 4 PM",
-                story = "Language is the gateway to our soul and culture. Sharing linguistic warmth with grandchildren.",
-                topic = "languages"
-            ),
-            CategoryData(
-                category = "LEARN & GROW",
-                subExp = "Finance & Retirement",
-                emoji = "🪙",
-                fee = 299,
-                baseNames = listOf("Gopalakrishnan Iyer", "Anand Shah", "Homi Khosla", "Gurcharan Singh", "V. K. Aggarwal"),
-                titles = listOf("Retired SBI Chief Manager & Banking Ombudsman", "Senior Provident Fund Advisor", "Tax Planning & Estate Consultant", "Senior Citizen Savings Expert", "Retirement Portfolio Planner"),
-                bios = listOf(
-                    "Specialist in senior savings scheme optimization, bank claims, mutual gold bonds, and securing seniors from digital phone frauds.",
-                    "Senior financial planner mapping secure pensions and senior savings accounts.",
-                    "Decisive retirement advisory, bank deposits, and senior pension scheme maximization.",
-                    "Veteran tax attorney offering free financial literacy and simple planning tips.",
-                    "Advising on secure senior benefit deposits and healthcare policy audits."
-                ),
-                skills = listOf("SBI Senior Savings Scheme", "Tax & Mutual Funds Allocation", "Gold Deposit Schemes", "Provident Fund Claims"),
-                avail = "Weekends 10 AM - 12 PM",
-                story = "Empowering seniors and households with absolute financial clarity and security.",
-                topic = "finance"
-            ),
-            CategoryData(
-                category = "HEALTH & WELLNESS",
-                subExp = "Ayurveda & Yoga",
-                emoji = "🧘",
-                fee = 299,
-                baseNames = listOf("Dr. Ramesh Krishnan", "Yogacharya Sudha", "Dr. Prabhas Varrier", "Vaidya Shrikant", "Ma Anandamayee"),
-                titles = listOf("Retired Chief Physiotherapist & Joint Care Advisor", "Joint Mobility & Breath Realignment Acharya", "Traditional Ayurvedic Nutrition Practitioner", "Senior Pulse & Herb Diagnostician", "Mindfulness & Sleep Meditation Guide"),
-                bios = listOf(
-                    "Restoring active knee movement and correcting posture. Stretching for spinal decompression.",
-                    "Gentle yoga asanas designed carefully for overall elder joint flexibility and core lung strength.",
-                    "Explaining Ayurvedic food pairings, seasonal diets, and simple immune spices.",
-                    "Sharing insights on how common garden herbs like Tulsi and Ginger support gut health.",
-                    "Soothing breathing meditations and sleep narratives to cure insomnia naturally."
-                ),
-                skills = listOf("Joint Flex Yoga Asanas", "Ayurvedic Food Pairings", "Herb Gardening For Care", "Soothing Sleep Breathing"),
-                avail = "Daily 7 AM - 9 AM",
-                story = "A healthy body is a peaceful temple. Sharing deep wellness routines for sound living.",
-                topic = "wellness"
-            ),
-            CategoryData(
-                category = "LEARN & GROW",
-                subExp = "Legal Advice & Law",
-                emoji = "⚖️",
-                fee = 399,
-                baseNames = listOf("Justice S. K. Kaul", "Mukul Rohatgi", "Prashant Bhushan", "Harish Salve", "Solomon Alvares"),
-                titles = listOf("Retired High Court Arbitrator", "Senior Civil Property Advocate", "Seniors Welfare Legal Counsel", "Family Heritage Allocation Specialist", "Consumer Rights Counselor"),
-                bios = listOf(
-                    "Resolving community disputes amicably and providing free legal literacy tutorials.",
-                    "Explaining land titles, property deeds, and registration procedures simply.",
-                    "Helping elders understand pension rights, consumer safety, and healthcare laws.",
-                    "Advising on family heritage asset allocation and drafting clean valid will drafts.",
-                    "Assisting average citizens write formal consumer complaint notices successfully."
-                ),
-                skills = listOf("Will Drafting Templates", "Property Document Audits", "Consumer Court Procedures", "Amicable Mediation Options"),
-                avail = "Wed-Fri 5 PM - 7 PM",
-                story = "Committed to legal empowerment of everyday citizens and seniors without complex jargon.",
-                topic = "legal"
-            ),
-            CategoryData(
-                category = "ARTS, MUSIC & CULTURE",
-                subExp = "Music & Crafts",
-                emoji = "🎵",
-                fee = 199,
-                baseNames = listOf("Kalyani Devi", "Pt. Jasraj Bhatte", "Smt. Shashi Iyengar", "Swaroop Kishen", "Kalyani Subramanyan"),
-                titles = listOf("Traditional Indian Art Scroll & Folk Crafts Master", "Classical Hindustani Vocal Acharya", "Traditional Bhajan Chanting Scholar", "Carnatic Flute & Violin Instructor", "Devotional Abhang Folk Coach"),
-                bios = listOf(
-                    "Teaching Cheriyal scroll painting, mixing organic mineral pigment colors, and creating miniature folk canvas art.",
-                    "Conducting interactive group sessions in classical Hindustani morning ragas.",
-                    "Teaching children comforting ancient devotional bhajans with sweet easy refrains.",
-                    "Sharing basic Carnatic melodies and instrument tuning rules with school children.",
-                    "Teaching Maharashtrian Vitthal Abhang rhythms and simple clapping beats."
-                ),
-                skills = listOf("Raga Vocal Breathing", "Ancient Devotional Chants", "Carnatic Note Tuning", "Vitthal Abhang Rhythms"),
-                avail = "Mon-Wed 4 PM - 6 PM",
-                story = "Restoring mental peace through melodic waves of ancient legacy.",
-                topic = "music"
-            ),
-            CategoryData(
-                category = "NATURE & LIFESTYLE",
-                subExp = "Gardening",
-                emoji = "🌱",
-                fee = 0,
-                baseNames = listOf("Major Gen. (Retd.) S. C. Dutta", "Savita Deshpande", "Madhusudan Rao", "Balkrishna Kamat", "Urmila Sen"),
-                titles = listOf("Veteran Terrace Gardening & Organic Farming Pioneer", "Terrace Kitchen Garden Practitioner", "Bonsai and Rose Cultivations Guide", "Organic Composting Enthusiast", "Balcony Herb Garden Educator"),
-                bios = listOf(
-                    "Setting up kitchen roof organic retreats, bonsai pruning, composting methods, and rose grafting solutions.",
-                    "Helping neighborhood families setup terrace kitchen gardens for fresh organic tomatoes.",
-                    "Sharing secrets of nursing miniature bonsai trees and perfect seasonal roses.",
-                    "Showing easy kitchen-waste composting methods that produce zero foul smell.",
-                    "Maximizing small balcony spaces of city apartments to grow fresh aromatic herbs."
-                ),
-                skills = listOf("Organic Tomato Soil Prep", "Dry Waste Odorless Compost", "Bonsai Stem Pruning", "Aromatic Balcony Herbs"),
-                avail = "Saturdays 8 AM - 10 AM",
-                story = "Connecting hearts with the earth. AI Chachi says: 'Their tomatoes are as red and sweet as apples Ramesh beta!'",
-                topic = "gardening"
-            )
+        val indianFirstNames = listOf(
+            "Rajesh", "Savita", "Satyendra", "Lakshmi", "Anand", "Nirmala", "Gopalakrishna", "Meera", "Sanjay", "Sudha",
+            "Vijay", "Devyani", "Pradeep", "Harish", "Asha", "Usha", "Arun", "Sharda", "Preeti", "Rohan",
+            "Anjali", "Suresh", "Vikram", "Gaurav", "Sita", "Hari", "Vasudev", "Parvathi", "Chidambaram", "Apurva",
+            "Shrikant", "Dushyanth", "Kunal", "Sanjeev", "Tarla", "Vikas", "Rujuta", "Sampad", "Pushpa", "Rukmini",
+            "Amar", "Bikas", "Chanda", "Deepak", "Eshwar", "Giridhar", "Himanshu", "Ila", "Jayant", "Kiran"
+        )
+        val indianLastNames = listOf(
+            "Sharma", "Rao", "Nath", "Gupta", "Shah", "Iyer", "Krishnan", "Varrier", "Patel", "Mehta",
+            "Acharya", "Dutta", "Deshpande", "Kamat", "Sen", "Kaul", "Rohatgi", "Bhushan", "Salve", "Alvares",
+            "Pillai", "Mishra", "Sridhar", "Vyas", "Dixit", "Prasad", "Khanna", "Kapur", "Sinha", "Joshi",
+            "Bose", "Reddy", "Nair", "Pillai", "Menon", "Mukherjee", "Chatterjee", "Banerjee", "Bhatte", "Iyengar",
+            "Swamy", "Acharya", "Hegde", "Varma", "Gowda", "Naidu", "Roy", "Mitra", "Sahu", "Pande"
         )
 
-        // Generate 5 distinct variations for each category
-        for (cat in categoriesData) {
-            for (i in 0 until 5) {
-                val finalName = cat.baseNames[i]
-                val idSuffix = finalName.lowercase().replace(" ", "_").replace(".", "")
-                val uniqueId = "exp_seed_${cat.topic}_$i"
-                
-                val defaultTags = when (cat.topic) {
-                    "maths" -> listOf("Maths", "Science", "STEM", "Education & Tutoring", "LEARN & GROW")
-                    "science" -> listOf("Science", "Technology", "STEM", "Traditional Skills", "LEARN & GROW")
-                    "languages" -> listOf("Languages", "English", "Traditional Skills", "LEARN & GROW")
-                    "finance" -> listOf("Finance", "Financial Literacy", "LEARN & GROW")
-                    "legal" -> listOf("Legal", "Legal Knowledge", "LEARN & GROW")
-                    "wellness" -> listOf("Wellness", "Ayurveda", "Yoga", "HEALTH & WELLNESS")
-                    "music" -> listOf("Music", "Arts", "Culture", "Traditional Skills", "ARTS, MUSIC & CULTURE")
-                    "gardening" -> listOf("Gardening", "Plants", "Nature", "NATURE & LIFESTYLE")
-                    else -> listOf(cat.topic)
-                } + cat.skills + listOf(cat.subExp)
+        val categorySpecs = listOf(
+            Pair("science", listOf("physics", "chemistry", "biology", "botany", "zoology", "nature_life_sciences", "environmental_science")),
+            Pair("maths", listOf("algebra", "vedic_maths", "board_prep", "calculus", "statistics", "jee_preparation")),
+            Pair("languages", listOf("hindi", "tamil", "french", "malayalam", "sanskrit", "kannada", "telugu", "english_speaking")),
+            Pair("career", listOf("career_counselling", "interview_coaching", "resume_building", "corporate_mentoring", "startup_guidance", "government_exam_coaching")),
+            Pair("banking_finance", listOf("retail_banking", "branch_management", "investment_planning", "fixed_deposits", "loan_guidance", "retirement_planning")),
+            Pair("ayurveda", listOf("kerala_ayurveda", "panchakarma", "ayurvedic_nutrition", "herbal_medicine", "ayurvedic_consultation", "naturopathy")),
+            Pair("dance", listOf("bharatanatyam", "kuchipudi", "kathak", "odissi", "mohiniyattam", "manipuri", "folk_dance")),
+            Pair("music", listOf("carnatic_vocal", "hindustani_vocal", "carnatic_instrumental", "hindustani_instrumental", "bhajans_devotional", "light_music", "film_songs")),
+            Pair("physiotherapy", listOf("orthopaedic_physio", "neurological_physio", "sports_physio", "geriatric_physio", "cardiac_physio", "paediatric_physio", "post_surgery_rehab", "joint_specialist", "spine_specialist"))
+        )
 
-                // Construct realistic, rich, multi-dimensional profiles
-                list.add(
-                    Expert(
-                        id = uniqueId,
-                        name = finalName,
-                        title = cat.titles[i],
-                        category = cat.category,
-                        yearsOfExperience = 25 + (i * 3) + (cat.fee % 5),
-                        areaEmoji = cat.emoji,
-                        isVerifiedExpert = true,
-                        languages = listOf("English", if (i % 2 == 0) "Hindi" else "Assamese"),
-                        rating = 4.8 + (i * 0.05),
-                        testimonialsCount = 18 + (i * 4),
-                        peopleHelpedCount = 105 + (i * 35),
-                        avatarUrl = "avatar_${idSuffix}",
-                        bio = cat.bios[i],
-                        certificationStatus = "Certified " + cat.titles[i],
-                        introductionText = "Welcome grandchildren! Let's sit together and explore the beauty of " + cat.subExp + " today. Pranam.",
-                        myStoryText = finalName + " has dedicated " + (25 + i * 3) + " glorious years to their calling. " + cat.story + " AI Chachi says: 'They are an absolute pillar of our community! Talk to them to experience deep traditional care and clarity.'",
-                        skillsTags = cat.skills + listOf(cat.subExp, "Interactive learning"),
-                        tags = defaultTags,
-                        activeOfflineAvailability = cat.avail,
-                        flatSessionFee = cat.fee - (i * 15),
-                        isOnlineNow = (i % 3 == 0),
-                        topic = cat.topic
-                    )
-                )
+        fun getSpecialisationDisplay(category: String, spec: String, expertIdx: Int): String {
+            return when (category) {
+                "career" -> {
+                    when (expertIdx % 5) {
+                        0 -> "Retired HR Head from TCS/Infosys"
+                        1 -> "Ex-IAS officer career guidance"
+                        2 -> "Retired Army officer career transition"
+                        3 -> "Ex-corporate trainer"
+                        4 -> "Retired university professor"
+                        else -> "Career Consultant"
+                    }
+                }
+                "banking_finance" -> {
+                    when (expertIdx % 5) {
+                        0 -> "Retired Branch Manager, SBI"
+                        1 -> "Retired Chief Manager, Bank of Baroda"
+                        2 -> "Retired Senior Manager, Punjab National Bank"
+                        3 -> "Ex-RBI officer"
+                        4 -> "Retired LIC branch manager"
+                        else -> "Banking & Finance Expert"
+                    }
+                }
+                "ayurveda" -> {
+                    when (spec) {
+                        "kerala_ayurveda" -> "Kerala Ayurvedic Doctor (BAMS)"
+                        "panchakarma" -> "Panchakarma specialist from Thrissur"
+                        "ayurvedic_nutrition" -> "Ayurvedic nutrition consultant"
+                        "herbal_medicine" -> "Senior Ayurvedic Herbologist"
+                        "ayurvedic_consultation" -> "Ayurvedic Consultation (BAMS)"
+                        "naturopathy" -> "Traditional Naturopathy Expert"
+                        else -> "Ayurveda Doctor (BAMS)"
+                    }
+                }
+                "dance" -> {
+                    val base = when (spec) {
+                        "bharatanatyam" -> "Bharatanatyam Instructor"
+                        "kuchipudi" -> "Kuchipudi Acharya"
+                        "kathak" -> "Kathak Teacher"
+                        "odissi" -> "Odissi Dancer"
+                        "mohiniyattam" -> "Mohiniyattam Guru"
+                        "manipuri" -> "Manipuri exponent"
+                        "folk_dance" -> "Folk Dance Instructor"
+                        else -> "Dance Acharya"
+                    }
+                    if (expertIdx == 0) "$base · Kalakshetra" else base
+                }
+                "music" -> {
+                    when (spec) {
+                        "carnatic_vocal" -> "Carnatic Vocal · Grade 8 Trinity"
+                        "hindustani_vocal" -> "Hindustani Classical Vocal Guru"
+                        "carnatic_instrumental" -> "Carnatic Violinist"
+                        "hindustani_instrumental" -> "Hindustani Sitar Master"
+                        "bhajans_devotional" -> "Devotional Bhajan Guide"
+                        "light_music" -> "Light Music & Vocal Coach"
+                        "film_songs" -> "Classical Retro Film Melodies"
+                        else -> "Classical Music Guru"
+                    }
+                }
+                "physiotherapy" -> {
+                    when (spec) {
+                        "orthopaedic_physio" -> "Orthopaedic Physiotherapist"
+                        "neurological_physio" -> "Neurological Stroke rehab specialist"
+                        "sports_physio" -> "Sports Injury Physiotherapist"
+                        "geriatric_physio" -> "Senior Care Geriatric Physiotherapist"
+                        "cardiac_physio" -> "Cardiac Post-op physio specialist"
+                        "paediatric_physio" -> "Children's physical rehab coach"
+                        "post_surgery_rehab" -> "Post-Surgery joint restoration tutor"
+                        "joint_specialist" -> "Knee and Shoulder joint specialist"
+                        "spine_specialist" -> "Spinal Decompression specialist"
+                        else -> "Senior Physiotherapy Specialist"
+                    }
+                }
+                "science" -> {
+                    when (spec) {
+                        "physics" -> "High School Physics Teacher"
+                        "chemistry" -> "Chemistry Laboratory Tutor"
+                        "biology" -> "Biology & Botany Coach"
+                        "botany" -> "Plant & Botany Specialist"
+                        "zoology" -> "Fauna & Zoology Expert"
+                        "nature_life_sciences" -> "Nature & Life Sciences Guide"
+                        "environmental_science" -> "Eco Systems & Environmental Scientist"
+                        else -> "Science Educator"
+                    }
+                }
+                "maths" -> {
+                    when (spec) {
+                        "algebra" -> "Algebra & Geometry Mentor"
+                        "vedic_maths" -> "Vedic Mathematics Guru"
+                        "board_prep" -> "Board Examination Math Coach"
+                        "calculus" -> "Applied Calculus Teacher"
+                        "statistics" -> "Probability & Statistics Advisor"
+                        "jee_preparation" -> "IIT-JEE Advanced Mathematics Coach"
+                        else -> "Vedic Maths Guru"
+                    }
+                }
+                "languages" -> {
+                    when (spec) {
+                        "hindi" -> "Hindi Sahitya Literature Guide"
+                        "tamil" -> "Classical Tamil Language Guru"
+                        "french" -> "Conversational French Coach"
+                        "malayalam" -> "Malayalam Language Advisor"
+                        "sanskrit" -> "Sanskrit Grammar & Sloka scholar"
+                        "kannada" -> "Kannada Bhasha Literature Scholar"
+                        "telugu" -> "Fluent Telugu Vocabulary Tutor"
+                        "english_speaking" -> "Interactive English Speaking Coach"
+                        else -> "Heritage Language Scholar"
+                    }
+                }
+                else -> "Specialised Mentor"
             }
         }
 
-        // Explicit user-requested test experts to fulfill:
-        // Science: Dr. Rao, Prof. Sharma, Dr. Meera
-        // Technology: Dr. Rao, Anand Kumar, Ravi Menon
-        // STEM: Dr. Rao, Prof. Sharma, Anand Kumar
-        list.add(
-            Expert(
-                id = "exp_dr_rao",
-                name = "Dr. Rao",
-                title = "Senior STEM & Technology Mentor",
-                category = "LEARN & GROW",
-                yearsOfExperience = 32,
-                areaEmoji = "🔬",
-                isVerifiedExpert = true,
-                languages = listOf("English", "Hindi", "Telugu"),
-                rating = 4.9,
-                testimonialsCount = 28,
-                peopleHelpedCount = 190,
-                avatarUrl = "avatar_dr_rao",
-                bio = "Specialist in engineering concepts, coding fundamentals, and fun science models.",
-                certificationStatus = "Ph.D. in STEM Education",
-                introductionText = "Welcome beta! Let's explore science, technology, and coding in a friendly way.",
-                myStoryText = "Dr. Rao spent 32 years teaching college students. AI Chachi says: 'Dr. Rao is exceptionally warm! He explains science like a beautiful story.'",
-                skillsTags = listOf("Science", "Technology", "STEM", "Coding", "Physics"),
-                tags = listOf("Science", "Technology", "STEM"),
-                activeOfflineAvailability = "Daily 4 PM - 6 PM",
-                flatSessionFee = 0,
-                isOnlineNow = true,
-                topic = "science"
-            )
-        )
-
-        list.add(
-            Expert(
-                id = "exp_prof_sharma",
-                name = "Prof. Sharma",
-                title = "Physics & Applied STEM Professor",
-                category = "LEARN & GROW",
-                yearsOfExperience = 28,
-                areaEmoji = "📐",
-                isVerifiedExpert = true,
-                languages = listOf("English", "Hindi"),
-                rating = 4.88,
-                testimonialsCount = 22,
-                peopleHelpedCount = 140,
-                avatarUrl = "avatar_prof_sharma",
-                bio = "Simplifying basic gravity, space exploration, and aerospace concepts for kids.",
-                certificationStatus = "Certified STEM Educator",
-                introductionText = "Namaste! Let's unlock the secrets of physical sciences together.",
-                myStoryText = "Prof. Sharma loves creating safe household chemistry and physics lab prototypes.",
-                skillsTags = listOf("Science", "STEM", "Physics", "Thermodynamics"),
-                tags = listOf("Science", "STEM"),
-                activeOfflineAvailability = "Wed-Fri 3 PM - 5 PM",
-                flatSessionFee = 0,
-                isOnlineNow = true,
-                topic = "science"
-            )
-        )
-
-        list.add(
-            Expert(
-                id = "exp_dr_meera",
-                name = "Dr. Meera",
-                title = "Cellular Biology & Nature Scientist",
-                category = "LEARN & GROW",
-                yearsOfExperience = 26,
-                areaEmoji = "🌿",
-                isVerifiedExpert = true,
-                languages = listOf("English", "Tamil"),
-                rating = 4.92,
-                testimonialsCount = 19,
-                peopleHelpedCount = 110,
-                avatarUrl = "avatar_dr_meera",
-                bio = "Exploring plant cells, environment systems, and biology fundamentals.",
-                certificationStatus = "Member of National Biotech Council",
-                introductionText = "Hello! Let's study gardening biology and bio-mechanics.",
-                myStoryText = "Dr. Meera has spent decades in laboratory projects before starting teaching.",
-                skillsTags = listOf("Science", "Biology", "Botany"),
-                tags = listOf("Science"),
-                activeOfflineAvailability = "Weekends 10 AM - 12 PM",
-                flatSessionFee = 0,
-                isOnlineNow = false,
-                topic = "science"
-            )
-        )
-
-        list.add(
-            Expert(
-                id = "exp_anand_kumar",
-                name = "Anand Kumar",
-                title = "Senior Software Architect & IT Mentor",
-                category = "LEARN & GROW",
-                yearsOfExperience = 30,
-                areaEmoji = "💻",
-                isVerifiedExpert = true,
-                languages = listOf("English", "Hindi"),
-                rating = 4.95,
-                testimonialsCount = 45,
-                peopleHelpedCount = 410,
-                avatarUrl = "avatar_anand_kumar",
-                bio = "Teaching basic Python, computer safety, and internet fundamentals to kids and seniors.",
-                certificationStatus = "Ex-Director Technology Projects",
-                introductionText = "Pranam! Coding is like cooking—it is just following a yummy recipe step by step.",
-                myStoryText = "Anand is highly passionate about spreading digital education to remote areas.",
-                skillsTags = listOf("Technology", "STEM", "Coding", "Python", "Computers"),
-                tags = listOf("Technology", "STEM"),
-                activeOfflineAvailability = "Tue-Thu 5 PM - 7 PM",
-                flatSessionFee = 0,
-                isOnlineNow = true,
-                topic = "science"
-            )
-        )
-
-        list.add(
-            Expert(
-                id = "exp_ravi_menon",
-                name = "Ravi Menon",
-                title = "E-Commerce & Digital Tools Specialist",
-                category = "LEARN & GROW",
-                yearsOfExperience = 25,
-                areaEmoji = "📱",
-                isVerifiedExpert = true,
-                languages = listOf("English", "Malayalam"),
-                rating = 4.85,
-                testimonialsCount = 15,
-                peopleHelpedCount = 85,
-                avatarUrl = "avatar_ravi_menon",
-                bio = "Helping setup micro businesses, understand UPI payments, and use smart gadgets.",
-                certificationStatus = "Technology Empowerment Lead",
-                introductionText = "Hello! Technology should make your life simpler and happier, not confusing.",
-                myStoryText = "Ravi hosts community tech drives helping grandparents confidently navigate banking apps.",
-                skillsTags = listOf("Technology", "UPI Payments", "Digital Tools"),
-                tags = listOf("Technology"),
-                activeOfflineAvailability = "Saturdays 3 PM - 6 PM",
-                flatSessionFee = 0,
-                isOnlineNow = true,
-                topic = "science"
-            )
-        )
-
-        // Dynamically populate 3 experts for each of the 17 requested topics to satisfy the requirement
-        val topicGroups = listOf(
-            Triple("bharatanatyam", "Classical Dance", listOf("Smt. Rukmini Sripada", "Vidhushi Leela Samson", "Guru Priyamvada Acharya")),
-            Triple("veena", "Veena Artistry", listOf("Dr. Jeyaraaj Pillai", "Saraswathi Chidambaram", "Rajhesh Vaidhya Swamy")),
-            Triple("violin", "Violin Mastery", listOf("Lalgudi GJR Raman", "Vidhushi A. Kanyakumari", "Dr. M. Lalitha Sister")),
-            Triple("vocal music", "Vocal Sing & Voice", listOf("Sanjay Subrahmanyan Iyer", "Sudha Ragunathan Singer", "Aruna Sairam Bhajan")),
-            Triple("bhajans", "Devotional Bhajans", listOf("Hariom Sharan Devotional", "Anup Jalota Samrat", "Sanjeev Abhyankar Vocal")),
-            Triple("gardening", "Green Gardening", listOf("Balkrishna Kamat Root", "Urmila Sen Balcony", "Savita Deshpande Soil")),
-            Triple("terrace gardening", "Terrace Greenery", listOf("Major Gen. Dutta Sky", "Dr. Prabhakar Rao Organic", "Kiran Doshi Roof")),
-            Triple("organic farming", "Sustainable Farming", listOf("Subhash Palekar Zero", "Devendra Sharma Earth", "Dr. Vandana Shiva Native")),
-            Triple("banking", "Financial Security", listOf("Gopalakrishnan Iyer Bank", "Srinivas Rao Guard", "Shyamala Gopinath Former")),
-            Triple("counselling", "Emotional Support", listOf("Dr. Shailesh Kumar Heart", "Prof. Aruna Goel Calm", "Sister Shivani Wisdom")),
-            Triple("physiotherapy", "Joint Movement", listOf("Dr. Ramesh Krishnan Knee", "Dr. Ali Irani Sports", "Dr. Priya Deshmukh Pain")),
-            Triple("meditation", "Mindfulness Dhyana", listOf("Sri Sri Ravishankar Peace", "Ma Anandamayee Sleep", "Swami Chidanand Meditation")),
-            Triple("nutrition", "Diet & Grains", listOf("Dr. Prabhas Varrier Diet", "Rujuta Diwekar Ghee", "Dr. Shikha Sharma Nutri")),
-            Triple("cooking", "Traditional Recipes", listOf("Tarla Dalal Pickle", "Vikas Khanna Spice", "Chef Kunal Kapur Feast")),
-            Triple("sanskrit", "Vedic Sanskrit Panini", listOf("Acharya Shastri Sloka", "Dr. Sampad Mishra Rhythms", "Prof. Pushpa Dixit Formula")),
-            Triple("ramayana", "Epic Scriptures", listOf("Kalluri Rao Sundarakanda", "Dr. Dushyanth Sridhar Epics", "Pt. Ramswarup Vyas")),
-            Triple("traditional arts", "Folk Crafts", listOf("Kalyani Devi Cheriyal", "Smt. Shashi Iyengar Tanjore", "Pt. Dwaraka Prasad Pottery"))
-        )
-
-        for (group in topicGroups) {
-            val (t, desc, names) = group
-            for (j in 0 until 3) {
-                val name = names[j]
-                val idSuffix = name.lowercase().replace(" ", "_").replace(".", "")
-                val uniqueId = "exp_req_seed_${t}_$j"
-                val category = when (t) {
-                    "maths", "science", "languages", "finance", "legal", "banking", "sanskrit" -> "LEARN & GROW"
-                    "wellness", "counselling", "physiotherapy", "meditation", "nutrition" -> "HEALTH & WELLNESS"
-                    "music", "bharatanatyam", "veena", "violin", "vocal music", "bhajans", "traditional arts" -> "ARTS, MUSIC & CULTURE"
-                    "gardening", "terrace gardening", "organic farming", "cooking" -> "NATURE & LIFESTYLE"
-                    "ramayana" -> "STORIES & HERITAGE"
-                    else -> "LEARN & GROW"
-                }
-                
-                val displayTag = t.split(" ").joinToString(" ") { it.replaceFirstChar { char -> char.uppercase() } }
-
-                val targetTags = when (t) {
-                    "bharatanatyam" -> listOf("Bharatanatyam", "Classical Music", "Arts & Culture", "Traditional Arts")
-                    "veena" -> listOf("Veena", "Carnatic Music", "Classical Music", "Arts & Culture", "Traditional Arts")
-                    "violin" -> listOf("Violin", "Carnatic Music", "Classical Music", "Arts & Culture", "Traditional Arts")
-                    "vocal music" -> listOf("Vocal Music", "Carnatic Music", "Classical Music", "Arts & Culture", "Traditional Arts")
-                    "bhajans" -> listOf("Bhajans", "Devotional Bhajans", "Arts & Culture", "Sanskrit", "Ramayana")
-                    "gardening" -> listOf("Gardening", "Plants", "Nature & Lifestyle")
-                    "terrace gardening" -> listOf("Terrace Gardening", "Gardening", "Plants", "Nature & Lifestyle")
-                    "organic farming" -> listOf("Organic Farming", "Gardening", "Nature & Lifestyle", "Agriculture")
-                    "banking" -> listOf("Banking", "Finance", "Financial Literacy", "LEARN & GROW")
-                    "counselling" -> listOf("Counselling", "Mental Health", "Wellness", "HEALTH & WELLNESS")
-                    "physiotherapy" -> listOf("Physiotherapy", "Joint Care", "Wellness", "HEALTH & WELLNESS")
-                    "meditation" -> listOf("Meditation", "Mindfulness", "Wellness", "HEALTH & WELLNESS")
-                    "nutrition" -> listOf("Nutrition", "Diet", "Wellness", "HEALTH & WELLNESS")
-                    "cooking" -> listOf("Cooking", "Traditional Recipes", "Nature & Lifestyle")
-                    "sanskrit" -> listOf("Sanskrit", "Languages", "Traditional Skills", "LEARN & GROW", "Stories & Heritage")
-                    "ramayana" -> listOf("Ramayana", "Heritage", "Stories & Heritage", "Traditional Arts")
-                    "traditional arts" -> listOf("Traditional Arts", "Arts", "Culture", "Arts & Culture")
-                    else -> listOf(displayTag)
-                }
-
-                list.add(
-                    Expert(
-                        id = uniqueId,
-                        name = name,
-                        title = "Veteran $displayTag Coach",
-                        category = category,
-                        yearsOfExperience = 24 + j * 4 + (idSuffix.length % 5),
-                        areaEmoji = "🎓", 
-                        isVerifiedExpert = true,
-                        languages = listOf("English", if (j % 2 == 0) "Hindi" else "Assamese"),
-                        rating = 4.8 + (j * 0.05),
-                        testimonialsCount = 15 + (j * 5),
-                        peopleHelpedCount = 95 + (j * 30),
-                        avatarUrl = "avatar_${idSuffix}",
-                        bio = "Specialist in $desc, offering customized 1:1 online support tailored perfectly for grandchildren and seniors with beautiful patience.",
-                        certificationStatus = "Certified Specialist",
-                        introductionText = "Pranam! I am honored to support your exploration of $displayTag. Let's start with high joy!",
-                        myStoryText = "$name has spent over " + (20 + j * 5) + " glorious years teaching and perfecting their art. AI Chachi says: 'They are incredibly warm and possess the softest heart of our entire community!'",
-                        skillsTags = listOf(displayTag, desc, "Heritage Exploration"),
-                        tags = targetTags + listOf(displayTag, category),
-                        activeOfflineAvailability = "Everyday " + (j + 3) + " PM - " + (j + 6) + " PM",
-                        flatSessionFee = 0,
-                        isOnlineNow = (j % 2 == 0),
-                        topic = t
+        var globalIndex = 0
+        for ((catId, specs) in categorySpecs) {
+            for (specId in specs) {
+                for (expertIdx in 0 until 3) {
+                    val uniqueId = "exp_seed_${catId}_${specId}_$expertIdx"
+                    
+                    val firstNameIndex = (globalIndex * 17 + expertIdx * 7) % indianFirstNames.size
+                    val lastNameIndex = (globalIndex * 13 + expertIdx * 3) % indianLastNames.size
+                    val finalName = "${indianFirstNames[firstNameIndex]} ${indianLastNames[lastNameIndex]}"
+                    
+                    val specDisplay = getSpecialisationDisplay(catId, specId, expertIdx)
+                    val displayYearsOfExperience = 15 + (globalIndex * 3 + expertIdx) % 25
+                    
+                    val titleText = if (specDisplay.contains("·")) {
+                        specDisplay
+                    } else {
+                        "$specDisplay"
+                    }
+                    
+                    val idSuffix = finalName.lowercase().replace(" ", "_").replace(".", "")
+                    
+                    val bioText = when (catId) {
+                        "science" -> "Empowering youth in astronomy, fundamental equations, and general logic with 25+ years experience."
+                        "maths" -> "Simplifying mathematical structures, board exams preparations, and Vedic mental arithmetic tricks."
+                        "languages" -> "Dedicated to preserving our ancestral roots, classical literature, grammar, and fluent talking style."
+                        "career" -> "Guiding corporate aspirants and competitive preparation strategies based on real professional success."
+                        "banking_finance" -> "Helping senior citizens secure their savings certificates, resolve banking claims, and manage investments."
+                        "ayurveda" -> "Helping families integrate traditional wellness diet systems, seasonal detox guidelines, and herbal wisdom."
+                        "dance" -> "Nurturing aesthetic choreography rhythms, posture control, and cultural classical dances."
+                        "music" -> "Sharing the peaceful vibrations of classical melodies and sacred devotion."
+                        "physiotherapy" -> "Restoring active mobility, healing spinal decompression pain, and therapeutic rehab."
+                        else -> "Providing specialized mentoring and heritage knowledge with warmth and care."
+                    }
+                    
+                    val areaEmojiChar = when (catId) {
+                        "science" -> "🔬"
+                        "maths" -> "📐"
+                        "languages" -> "🗣️"
+                        "career" -> "💼"
+                        "banking_finance" -> "🏦"
+                        "ayurveda" -> "🌿"
+                        "dance" -> "💃"
+                        "music" -> "🎵"
+                        "physiotherapy" -> "🦾"
+                        else -> "🎓"
+                    }
+                    
+                    val tagsList = listOf(
+                        catId.uppercase().replace("_", " & "),
+                        catId,
+                        specId,
+                        specDisplay
                     )
-                )
+                    
+                    val feeRate = 100 + (globalIndex * 50) % 400
+                    
+                    list.add(
+                        Expert(
+                            id = uniqueId,
+                            name = finalName,
+                            title = titleText,
+                            category = catId,
+                            yearsOfExperience = displayYearsOfExperience,
+                            areaEmoji = areaEmojiChar,
+                            isVerifiedExpert = true,
+                            languages = listOf("English", if (expertIdx % 2 == 0) "Hindi" else "Regional"),
+                            rating = 4.7 + (globalIndex % 4) * 0.1,
+                            testimonialsCount = 12 + expertIdx * 4,
+                            peopleHelpedCount = 95 + expertIdx * 30,
+                            avatarUrl = "avatar_${idSuffix}",
+                            bio = bioText,
+                            certificationStatus = "Certified $specDisplay",
+                            introductionText = "Greetings! Let's explore the depths of $specDisplay together.",
+                            myStoryText = "$finalName has dedicated decades to classical and professional mentorship. Passionate about sharing timeless insights, local cultural roots, and active professional techniques. AI Chachi says: 'Their guidance is pure gold Ramesh beta!'",
+                            skillsTags = listOf(specId, "1:1 Live Help"),
+                            tags = tagsList,
+                            activeOfflineAvailability = "Mon-Wed 3 PM - 5 PM",
+                            flatSessionFee = feeRate,
+                            isOnlineNow = (expertIdx == 0),
+                            topic = specId,
+                            specialisation = specId,
+                            specialisation_display = specDisplay
+                        )
+                    )
+                    globalIndex++
+                }
             }
         }
-
+        
         return list
     }
 

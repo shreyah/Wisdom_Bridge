@@ -13655,6 +13655,8 @@ fun CategoryDetailScreen(
 
     var activeTab by remember { mutableStateOf("FIND AN EXPERT") } // "FIND AN EXPERT", "JOIN A CIRCLE"
     var selectedFilterChip by remember { mutableStateOf("All") }
+    var selectedHighLevelCategory by remember { mutableStateOf("All") }
+    var selectedSpecialisationFilter by remember { mutableStateOf("All") }
     var joinedCommunitiesLocal by remember { mutableStateOf(setOf<String>()) }
     var bookedExpertNameForDialog by remember { mutableStateOf<String?>(null) }
     var viewModeState by remember { mutableStateOf("compact") } // "compact", "detailed", "ai_match"
@@ -13675,41 +13677,139 @@ fun CategoryDetailScreen(
     val isAiRecommending by viewModel.isAiRecommending.collectAsState()
     val aiRecommendationMessage by viewModel.aiRecommendationMessage.collectAsState()
 
-    LaunchedEffect(discoveryFilterState, selectedFilterChip) {
+    LaunchedEffect(discoveryFilterState, selectedHighLevelCategory, selectedSpecialisationFilter) {
         if (discoveryFilterState == "AI Matches") {
-            val query = if (selectedFilterChip == "All") category.name else selectedFilterChip
+            val query = if (selectedSpecialisationFilter != "All") {
+                selectedSpecialisationFilter
+            } else if (selectedHighLevelCategory != "All") {
+                selectedHighLevelCategory
+            } else {
+                category.name
+            }
             viewModel.searchTeachersByInterest(query)
         }
     }
 
-    // Dynamic Filter Chips for subcategories depending on the category selected
-    val filterChips = when (category.name.uppercase()) {
-        "LEARN & GROW", "LEARN AND GROW" -> listOf("All", "Maths", "Science", "Technology", "STEM", "Languages", "Banking", "Sanskrit", "Finance", "Legal")
-        "HEALTH & WELLNESS" -> listOf("All", "Wellness", "Counselling", "Physiotherapy", "Meditation", "Nutrition")
-        "RECIPES & TRADITIONS", "RECIPES AND TRADITIONS" -> listOf("All", "Wellness", "Cooking")
-        "ARTS, MUSIC & CULTURE", "ARTS & CULTURE", "ARTS, MUSIC AND CULTURE" -> listOf("All", "Music", "Bharatanatyam", "Veena", "Violin", "Vocal Music", "Bhajans", "Traditional Arts")
-        "STORIES & HERITAGE", "STORIES AND HERITAGE" -> listOf("All", "Languages", "Sanskrit", "Ramayana")
-        "NATURE & LIFESTYLE", "NATURE AND LIFESTYLE" -> listOf("All", "Gardening", "Terrace Gardening", "Organic Farming", "Cooking")
-        else -> listOf("All")
-    }
-
-    val matchesFilter: (Expert, String) -> Boolean = { expert, filter ->
-        if (filter == "All") true
-        else filter in expert.tags
-    }
-
-    // Filtered experts relevant to this category name, AND further filtered by subcategory chip instantly
-    val filteredExperts = experts.filter { expert ->
-        val belongsToCategory = when (category.name.uppercase()) {
-            "LEARN & GROW", "LEARN AND GROW" -> expert.category == "LEARN & GROW" || expert.topic in listOf("maths", "science", "languages", "finance", "legal", "banking", "sanskrit")
-            "HEALTH & WELLNESS" -> expert.category == "HEALTH & WELLNESS" || expert.topic in listOf("wellness", "counselling", "physiotherapy", "meditation", "nutrition")
-            "RECIPES & TRADITIONS", "RECIPES AND TRADITIONS" -> expert.category == "HEALTH & WELLNESS" || expert.category == "NATURE & LIFESTYLE" || expert.topic in listOf("wellness", "cooking")
-            "ARTS, MUSIC & CULTURE", "ARTS & CULTURE", "ARTS, MUSIC AND CULTURE" -> expert.category == "ARTS, MUSIC & CULTURE" || expert.topic in listOf("music", "bharatanatyam", "veena", "violin", "vocal music", "bhajans", "traditional arts")
-            "STORIES & HERITAGE", "STORIES AND HERITAGE" -> expert.category == "STORIES & HERITAGE" || expert.category == "LEARN & GROW" || expert.topic in listOf("languages", "sanskrit", "ramayana")
-            "NATURE & LIFESTYLE", "NATURE AND LIFESTYLE" -> expert.category == "NATURE & LIFESTYLE" || expert.topic in listOf("gardening", "terrace gardening", "organic farming", "cooking")
-            else -> true
+    // Dynamic Filter helper functions
+    fun getHighLevelCategoryName(cat: String): String {
+        return when (cat) {
+            "science" -> "Science 🔬"
+            "maths" -> "Maths 📐"
+            "languages" -> "Languages 🗣️"
+            "career" -> "Career & Growth 💼"
+            "banking_finance" -> "Banking & Finance 💰"
+            "ayurveda" -> "Ayurveda Wellness 🌿"
+            "dance" -> "Indian Classical Dance 💃"
+            "music" -> "Music & Vocals 🎵"
+            "physiotherapy" -> "Physiotherapy Rehab 🦵"
+            else -> cat.replace("_", " ").replaceFirstChar { it.uppercase() }
         }
-        belongsToCategory && matchesFilter(expert, selectedFilterChip)
+    }
+
+    fun getSpecialisationDisplayName(spec: String): String {
+        return when (spec) {
+            "physics" -> "Physics"
+            "chemistry" -> "Chemistry"
+            "biology" -> "Biology"
+            "botany" -> "Botany"
+            "zoology" -> "Zoology"
+            "nature_life_sciences" -> "Nature & Life"
+            "environmental_science" -> "Environmental"
+            
+            "algebra" -> "Algebra"
+            "vedic_maths" -> "Vedic Maths"
+            "board_prep" -> "Board Prep"
+            "calculus" -> "Calculus"
+            "statistics" -> "Statistics"
+            "jee_preparation" -> "JEE Prep"
+            
+            "hindi" -> "Hindi"
+            "tamil" -> "Tamil"
+            "french" -> "French"
+            "malayalam" -> "Malayalam"
+            "sanskrit" -> "Sanskrit"
+            "kannada" -> "Kannada"
+            "telugu" -> "Telugu"
+            "english_speaking" -> "English Speaking"
+            
+            "career_counselling" -> "Counselling"
+            "interview_coaching" -> "Interview Prep"
+            "resume_building" -> "Resume Prep"
+            "corporate_mentoring" -> "Corporate"
+            "startup_guidance" -> "Startups"
+            "government_exam_coaching" -> "Govt Exams"
+            
+            "retail_banking" -> "Retail Banking"
+            "branch_management" -> "Branch Management"
+            "investment_planning" -> "Investment"
+            "fixed_deposits" -> "Fixed Deposits"
+            "loan_guidance" -> "Loans"
+            "retirement_planning" -> "Retirement Plans"
+            
+            "kerala_ayurveda" -> "Kerala Ayurveda"
+            "panchakarma" -> "Panchakarma"
+            "ayurvedic_nutrition" -> "Diet & Herb"
+            "herbal_medicine" -> "Herbs"
+            "ayurvedic_consultation" -> "Consultation"
+            "naturopathy" -> "Naturopathy"
+            
+            "bharatanatyam" -> "Bharatanatyam"
+            "kuchipudi" -> "Kuchipudi"
+            "kathak" -> "Kathak"
+            "odissi" -> "Odissi"
+            "mohiniyattam" -> "Mohiniyattam"
+            "manipuri" -> "Manipuri"
+            "folk_dance" -> "Folk Dance"
+            
+            "carnatic_vocal" -> "Carnatic Vocal"
+            "hindustani_vocal" -> "Hindustani Vocal"
+            "carnatic_instrumental" -> "Carnatic Violin"
+            "hindustani_instrumental" -> "Hindustani Sitar"
+            "bhajans_devotional" -> "Bhajans / Chants"
+            "light_music" -> "Light Music"
+            "film_songs" -> "Retro Film"
+            
+            "orthopaedic_physio" -> "Orthopaedic"
+            "neurological_physio" -> "Neurological"
+            "sports_physio" -> "Sports Injuries"
+            "geriatric_physio" -> "Geriatric care"
+            "cardiac_physio" -> "Cardiac Rehab"
+            "paediatric_physio" -> "Paediatric rehab"
+            "post_surgery_rehab" -> "Post Surgery"
+            "joint_specialist" -> "Knee & Shoulder"
+            "spine_specialist" -> "Spine & Pain"
+            
+            else -> spec.replace("_", " ").replaceFirstChar { it.uppercase() }
+        }
+    }
+
+    val parentCategoryToHighLevelMap = when (category.name.uppercase()) {
+        "LEARN & GROW", "LEARN AND GROW" -> listOf("science", "maths", "languages", "career", "banking_finance")
+        "HEALTH & WELLNESS" -> listOf("ayurveda", "physiotherapy")
+        "RECIPES & TRADITIONS", "RECIPES AND TRADITIONS" -> listOf("ayurveda")
+        "ARTS, MUSIC & CULTURE", "ARTS & CULTURE", "ARTS, MUSIC AND CULTURE" -> listOf("dance", "music")
+        "STORIES & HERITAGE", "STORIES AND HERITAGE" -> listOf("languages")
+        "NATURE & LIFESTYLE", "NATURE AND LIFESTYLE" -> listOf("science")
+        else -> listOf("science", "maths", "languages", "career", "banking_finance", "ayurveda", "dance", "music", "physiotherapy")
+    }
+
+    // First filter by parent category page
+    val expertsInParentCategory = experts.filter { expert ->
+        expert.category in parentCategoryToHighLevelMap
+    }
+
+    // Then filter by selected high-level category chip
+    val filteredByHighLevel = if (selectedHighLevelCategory == "All") {
+        expertsInParentCategory
+    } else {
+        expertsInParentCategory.filter { it.category == selectedHighLevelCategory }
+    }
+
+    // Then filter by selected specialisation chip
+    val filteredExperts = if (selectedSpecialisationFilter == "All") {
+        filteredByHighLevel
+    } else {
+        filteredByHighLevel.filter { it.specialisation == selectedSpecialisationFilter }
     }
 
     // Additional filter based on discovery filter state (Available Today, Evening, Weekend)
@@ -13747,16 +13847,26 @@ fun CategoryDetailScreen(
     val filteredCommunities = communities.filter { comm ->
         val belongsToCategory = comm.category.contains(category.name, ignoreCase = true) ||
                 category.subExperiences.any { sub -> comm.name.contains(sub.name, ignoreCase = true) || comm.description.contains(sub.name, ignoreCase = true) }
-        val matchesChip = if (selectedFilterChip == "All") true else {
-            val f = selectedFilterChip.lowercase()
+        val matchesChip = if (selectedSpecialisationFilter != "All") {
+            val f = selectedSpecialisationFilter.lowercase()
             comm.name.lowercase().contains(f) || comm.description.lowercase().contains(f) || comm.category.lowercase().contains(f)
+        } else if (selectedHighLevelCategory != "All") {
+            val f = selectedHighLevelCategory.lowercase()
+            comm.name.lowercase().contains(f) || comm.description.lowercase().contains(f) || comm.category.lowercase().contains(f)
+        } else {
+            true
         }
         belongsToCategory && matchesChip
     }.ifEmpty {
         communities.filter { comm ->
-            if (selectedFilterChip == "All") true else {
-                val f = selectedFilterChip.lowercase()
+            if (selectedSpecialisationFilter != "All") {
+                val f = selectedSpecialisationFilter.lowercase()
                 comm.name.lowercase().contains(f) || comm.description.lowercase().contains(f) || comm.category.lowercase().contains(f)
+            } else if (selectedHighLevelCategory != "All") {
+                val f = selectedHighLevelCategory.lowercase()
+                comm.name.lowercase().contains(f) || comm.description.lowercase().contains(f) || comm.category.lowercase().contains(f)
+            } else {
+                true
             }
         }
     }
@@ -13904,67 +14014,145 @@ fun CategoryDetailScreen(
             // TAB 1 CONTENT: FIND AN EXPERT
             if (activeTab == "FIND AN EXPERT") {
 
-                    // Collate multiple categories/topics into one single visual slider/carousel
-                    val groupedTopics = getGroupedTopics(category.name, category.subExperiences)
-                    val collatedTopics = groupedTopics.flatMap { it.second }.distinctBy { it.name }
-                    val singleTitle = when (category.name.uppercase()) {
-                        "LEARN & GROW", "LEARN AND GROW" -> "Academic & Professional Topics"
-                        "HEALTH & WELLNESS" -> "Health, Mindfulness & Therapy"
-                        "RECIPES & TRADITIONS", "RECIPES AND TRADITIONS" -> "Traditional Kitchen & Heritage"
-                        "ARTS, MUSIC & CULTURE", "ARTS & CULTURE", "ARTS, MUSIC AND CULTURE" -> "Classical Music, Vocal & Arts"
-                        "STORIES & HERITAGE", "STORIES AND HERITAGE" -> "Wisdom Lore, Epics & Legends"
-                        "NATURE & LIFESTYLE", "NATURE AND LIFESTYLE" -> "Nature, Gardening & Lifestyle"
-                        else -> "Topics of Interest"
-                    }
-
-                    if (collatedTopics.isNotEmpty()) {
-                        item {
-                            Column(
+                    // --- REBUILT TWO-LEVEL FILTER SYSTEM FOR EXPERT SPECIALISATIONS ---
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp)
+                        ) {
+                            // Section Header
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 10.dp)
+                                    .padding(horizontal = 18.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
+                                Text(
+                                    text = "Filter by Specialist Category",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Text(
+                                    text = "Reset All",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 18.dp, vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = singleTitle,
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = MaterialTheme.colorScheme.onBackground
-                                    )
-                                    Text(
-                                        text = "See All",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary,
+                                        .clickable { 
+                                            selectedHighLevelCategory = "All"
+                                            selectedSpecialisationFilter = "All"
+                                        }
+                                )
+                            }
+
+                            // 1st Level: High level category row
+                            val fullCatsList = listOf("All") + parentCategoryToHighLevelMap
+                            LazyRow(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(fullCatsList) { cat ->
+                                    val isSelected = selectedHighLevelCategory == cat
+                                    val displayName = if (cat == "All") "All Categories 🌐" else getHighLevelCategoryName(cat)
+                                    val bgSelected = MaterialTheme.colorScheme.primary
+                                    val bgUnselected = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                    val borderCol = if (isSelected) MaterialTheme.colorScheme.primary else BorderLightSystem
+                                    val textColor = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
+
+                                    Box(
                                         modifier = Modifier
-                                            .clickable { 
-                                                selectedFilterChip = "All"
-                                                showAllExperts = false
+                                            .background(
+                                                if (isSelected) bgSelected else bgUnselected,
+                                                shape = RoundedCornerShape(20.dp)
+                                            )
+                                            .border(BorderStroke(1.dp, borderCol), RoundedCornerShape(20.dp))
+                                            .clickable {
+                                                selectedHighLevelCategory = cat
+                                                selectedSpecialisationFilter = "All" // Reset sub filter
                                             }
-                                    )
+                                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                                            .testTag("high_level_cat_${cat.lowercase()}"),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = displayName,
+                                            fontSize = 11.5.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = textColor
+                                        )
+                                    }
                                 }
+                            }
+
+                            // 2nd Level: Specialisation sub-filter chips
+                            val specsForCategory = when (selectedHighLevelCategory) {
+                                "science" -> listOf("physics", "chemistry", "biology", "botany", "zoology", "nature_life_sciences", "environmental_science")
+                                "maths" -> listOf("algebra", "vedic_maths", "board_prep", "calculus", "statistics", "jee_preparation")
+                                "languages" -> listOf("hindi", "tamil", "french", "malayalam", "sanskrit", "kannada", "telugu", "english_speaking")
+                                "career" -> listOf("career_counselling", "interview_coaching", "resume_building", "corporate_mentoring", "startup_guidance", "government_exam_coaching")
+                                "banking_finance" -> listOf("retail_banking", "branch_management", "investment_planning", "fixed_deposits", "loan_guidance", "retirement_planning")
+                                "ayurveda" -> listOf("kerala_ayurveda", "panchakarma", "ayurvedic_nutrition", "herbal_medicine", "ayurvedic_consultation", "naturopathy")
+                                "dance" -> listOf("bharatanatyam", "kuchipudi", "kathak", "odissi", "mohiniyattam", "manipuri", "folk_dance")
+                                "music" -> listOf("carnatic_vocal", "hindustani_vocal", "carnatic_instrumental", "hindustani_instrumental", "bhajans_devotional", "light_music", "film_songs")
+                                "physiotherapy" -> listOf("orthopaedic_physio", "neurological_physio", "sports_physio", "geriatric_physio", "cardiac_physio", "paediatric_physio", "post_surgery_rehab", "joint_specialist", "spine_specialist")
+                                else -> emptyList()
+                            }
+
+                            if (specsForCategory.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                
+                                Text(
+                                    text = "Specialisation for ${getHighLevelCategoryName(selectedHighLevelCategory)}:",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 2.dp)
+                                )
+
+                                Spacer(modifier = Modifier.height(4.dp))
 
                                 LazyRow(
                                     modifier = Modifier.fillMaxWidth(),
                                     contentPadding = PaddingValues(horizontal = 16.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    items(collatedTopics) { topic ->
-                                        val isSelected = selectedFilterChip.lowercase() == topic.tag.lowercase()
-                                        TopicVisualCard(
-                                            topic = topic,
-                                            isSelected = isSelected,
-                                            onClick = {
-                                                selectedFilterChip = if (isSelected) "All" else topic.name
-                                                showAllExperts = false
-                                            }
-                                        )
+                                    val fullSpecsList = listOf("All") + specsForCategory
+                                    items(fullSpecsList) { spec ->
+                                        val isSelected = selectedSpecialisationFilter == spec
+                                        val dispLabel = if (spec == "All") "Show All" else getSpecialisationDisplayName(spec)
+                                        
+                                        val bgSelected = MaterialTheme.colorScheme.primaryContainer
+                                        val bgUnselected = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                                        val borderCol = if (isSelected) MaterialTheme.colorScheme.primary else BorderLightSystem
+                                        val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+
+                                        Box(
+                                            modifier = Modifier
+                                                .background(
+                                                    if (isSelected) bgSelected else bgUnselected,
+                                                    shape = RoundedCornerShape(16.dp)
+                                                )
+                                                .border(BorderStroke(1.dp, borderCol), RoundedCornerShape(16.dp))
+                                                .clickable {
+                                                    selectedSpecialisationFilter = spec
+                                                }
+                                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                                .testTag("spec_chip_${spec.lowercase()}"),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = dispLabel,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = textColor
+                                            )
+                                        }
                                     }
                                 }
                             }

@@ -206,7 +206,9 @@ data class Expert(
     val knowledgeLibraryResources: List<CommunityResource> = emptyList(),
     val isVerifiedExpert: Boolean = true,
     val isOnlineNow: Boolean = true,
-    val topic: String = ""
+    val topic: String = "",
+    val specialisation: String = "",
+    val specialisation_display: String = ""
 )
 
 data class PreviousCall(

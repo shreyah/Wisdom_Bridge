@@ -1747,7 +1747,11 @@ class AgeNoBarViewModel : ViewModel() {
             
             val slotDaoSafe = slotDao ?: return
             val days = listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
-            val times = listOf("10:00 AM", "11:30 AM", "03:00 PM", "04:00 PM", "05:00 PM", "06:30 PM")
+            val times = listOf(
+                "06:00 AM", "07:00 AM", "08:00 AM", "09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
+                "01:00 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM", "06:00 PM", "07:00 PM",
+                "08:00 PM", "09:00 PM"
+            )
             val preseededSlots = mutableListOf<DbSlot>()
             
             generated.forEach { expert ->
@@ -2088,7 +2092,10 @@ class AgeNoBarViewModel : ViewModel() {
             expertDao?.insertExpert(dbExpert)
             
             val days = listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
-            val times = listOf("10:00 AM", "03:00 PM", "05:00 PM")
+            val times = listOf(
+                "06:00 AM", "08:00 AM", "10:00 AM", "12:00 PM",
+                "02:00 PM", "04:00 PM", "06:00 PM", "08:00 PM"
+            )
             val slots = days.flatMap { day ->
                 times.map { time ->
                     DbSlot(

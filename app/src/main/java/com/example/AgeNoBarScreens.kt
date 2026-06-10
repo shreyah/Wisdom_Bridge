@@ -16143,15 +16143,21 @@ fun PremiumBookingCalendarScreen(
     }
     var selectedDay by remember(initiallySelectedDay) { mutableStateOf(initiallySelectedDay) }
     
-    // Large details-focused vertical slots list
-    val standardSlots = listOf(
-        Pair("10:00 AM", "10:30 AM"),
-        Pair("11:30 AM", "12:00 PM"),
-        Pair("03:00 PM", "03:30 PM"),
-        Pair("04:00 PM", "04:30 PM"),
-        Pair("05:00 PM", "05:30 PM"),
-        Pair("06:30 PM", "07:00 PM")
-    )
+    // Large details-focused vertical slots list starting from 6:00 AM to 9:00 PM
+    val START_HOUR = 6
+    val END_HOUR = 21
+    val standardSlots = remember {
+        (START_HOUR..END_HOUR).map { hour ->
+            val ampm = if (hour < 12) "AM" else "PM"
+            val h = if (hour % 12 == 0) 12 else hour % 12
+            val formattedHour = String.format("%02d:00 %s", h, ampm)
+            val endHour = hour + 1
+            val endAmpm = if (endHour < 12 || endHour == 24) "AM" else "PM"
+            val eh = if (endHour % 12 == 0) 12 else endHour % 12
+            val formattedEndHour = String.format("%02d:00 %s", eh, endAmpm)
+            Pair(formattedHour, formattedEndHour)
+        }
+    }
     
     // Mapping of slot indexes to mock premium tutoring offerings for high-fidelity content
     val tutoringOfferings = listOf(
@@ -16164,7 +16170,8 @@ fun PremiumBookingCalendarScreen(
     )
 
     var alertMessage by remember { mutableStateOf<String?>(null) }
-    var showBookingConfirmationBySlot by remember { mutableStateOf<String?>(null) }
+    var showBookingConfirmationBySlot by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var activeRescheduleBookingId by remember(rescheduleBookingId) { mutableStateOf(rescheduleBookingId) }
     var blockedSlots by remember { mutableStateOf(setOf<String>()) } // Format: "WED • 10:00 AM - 10:30 AM"
     var bookingSuccessData by remember { mutableStateOf<BookingConfirmationData?>(null) }
     var selectedExpertForProfileState by remember { mutableStateOf<Expert?>(null) }
@@ -16447,339 +16454,191 @@ fun PremiumBookingCalendarScreen(
                                 )
                             }
 
-                            // Large glassmorphic vertical appointment card on the right
-                            Card(
-                                shape = RoundedCornerShape(28.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = when {
-                                        isBookedByYou -> SoftGreenCard
-                                        isBookedByPeer -> LightGreyCard
-                                        isBlockedSlot -> Color.Red.copy(alpha = 0.05f)
-                                        else -> PastelBlueCard
-                                    }
-                                ),
-                                border = BorderStroke(
-                                    width = 1.dp,
-                                    color = when {
-                                        isBookedByYou -> Color(0xFF88C999).copy(alpha = 0.4f)
-                                        isBookedByPeer -> Color.LightGray.copy(alpha = 0.4f)
-                                        isBlockedSlot -> Color.Red.copy(alpha = 0.15f)
-                                        else -> Color.White.copy(alpha = 0.5f)
-                                    }
-                                ),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("slot_card_$index")
-                                    .clickable {
-                                        if (isTeacherMode) {
-                                            // Handle teacher modes
-                                        } else {
-                                            if (!isBookedByPeer && !isBookedByYou && !isBlockedSlot) {
-                                                if (expertId == "common_calendar") {
-                                                    if (slotCategoryExpert != null) {
-                                                        selectedExpertForProfileState = slotCategoryExpert
-                                                    }
-                                                } else {
-                                                    if (rescheduleBookingId != null) {
-                                                        viewModel.rescheduleBooking(rescheduleBookingId, timingString)
-                                                        alertMessage = "Your session was successfully rescheduled to $timingString!"
-                                                    } else {
-                                                        showBookingConfirmationBySlot = timingString
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    },
-                                elevation = CardDefaults.cardElevation(
-                                    defaultElevation = if (isBookedByYou) 4.dp else 1.dp
-                                )
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(16.dp)
+                            // Large beautifully styled custom status card on the right
+                            if (isBookedByYou) {
+                                // BOOKED card (blue/purple tint background, with Reschedule & Join buttons)
+                                Card(
+                                    shape = RoundedCornerShape(24.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFECE5FD)), // Elegant modern blue/purple tint background
+                                    border = BorderStroke(1.dp, Color(0xFFD1C4E9)),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("booked_slot_card_$index")
                                 ) {
-                                    // Header of card (Class status indicator badge)
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                                    Column(
+                                        modifier = Modifier.padding(16.dp)
                                     ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                ProceduralLinkedInAvatar(
+                                                    name = matchingBooking?.expertName ?: (expert?.name ?: "Mentor"),
+                                                    sizeDp = 24,
+                                                    modifier = Modifier.clip(CircleShape)
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = "Hosted by ${matchingBooking?.expertName ?: (expert?.name ?: "Mentor")}",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.DarkGray
+                                                )
+                                            }
+                                            
+                                            // Status Badge
                                             Box(
                                                 modifier = Modifier
-                                                    .size(26.dp)
-                                                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f), CircleShape),
-                                                contentAlignment = Alignment.Center
+                                                    .background(Color(0xFFE8F5E9), RoundedCornerShape(8.dp))
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
                                             ) {
-                                                Text(classIcon, fontSize = 13.sp)
+                                                Text(
+                                                    text = "✅ Appointed",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = Color(0xFF2E7D32)
+                                                )
                                             }
-                                            Spacer(modifier = Modifier.width(6.dp))
+                                        }
+
+                                        Spacer(modifier = Modifier.height(10.dp))
+
+                                        // Subject Title
+                                        Text(
+                                            text = className,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.Black
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        
+                                        // Context Description
+                                        Text(
+                                            text = classDesc,
+                                            fontSize = 11.sp,
+                                            color = Color.DarkGray,
+                                            lineHeight = 15.sp
+                                        )
+
+                                        Spacer(modifier = Modifier.height(12.dp))
+
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            val isJoinedState = matchingBooking?.status == "Joined"
+                                            Button(
+                                                onClick = { 
+                                                    if (matchingBooking != null) {
+                                                        viewModel.joinBooking(matchingBooking.id)
+                                                    }
+                                                    alertMessage = "Joined classes successfully! Ready to learn."
+                                                },
+                                                shape = RoundedCornerShape(12.dp),
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = if (isJoinedState) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary
+                                                ),
+                                                modifier = Modifier
+                                                    .weight(1.2f)
+                                                    .height(44.dp)
+                                                    .testTag("enter_class_button_$index")
+                                            ) {
+                                                Text(if (isJoinedState) "Joined ✓" else "Enter Class 🎓", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                            
+                                            OutlinedButton(
+                                                onClick = {
+                                                    if (matchingBooking != null) {
+                                                        activeRescheduleBookingId = matchingBooking.id
+                                                        viewModel.setEditingBooking(matchingBooking)
+                                                    }
+                                                },
+                                                shape = RoundedCornerShape(12.dp),
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(44.dp)
+                                                    .testTag("reschedule_button_$index")
+                                            ) {
+                                                Text("Reschedule", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                // AVAILABLE slot card (white background, green available indicator, Book this slot button)
+                                Card(
+                                    shape = RoundedCornerShape(24.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("available_slot_card_$index")
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(16.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(6.dp)
+                                                        .background(Color(0xFF2ECC71), CircleShape)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = "Available",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFF27AE60)
+                                                )
+                                            }
                                             Text(
-                                                text = "Slot • $startTime",
+                                                text = "30 min",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontWeight = FontWeight.Bold,
                                                 color = Color.Gray
                                             )
                                         }
 
-                                        // Apple native style status capsule
-                                        Box(
-                                            modifier = Modifier
-                                                .background(
-                                                    color = when {
-                                                        isBookedByYou -> Color(0xFF2ECC71).copy(alpha = 0.15f)
-                                                        isBookedByPeer -> Color.Gray.copy(alpha = 0.1f)
-                                                        isBlockedSlot -> Color.Red.copy(alpha = 0.14f)
-                                                        matchingEvent != null -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                                                        else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                                                    },
-                                                    shape = RoundedCornerShape(10.dp)
-                                                )
-                                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                                        ) {
+                                        Spacer(modifier = Modifier.height(10.dp))
+
+                                        // Subject icon and name
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(classIcon, fontSize = 20.sp)
+                                            Spacer(modifier = Modifier.width(8.dp))
                                             Text(
-                                                text = when {
-                                                    isBookedByYou -> if (matchingEvent != null) "✓ Booked" else "✓ Appointed"
-                                                    isBookedByPeer -> "Occupied"
-                                                    isBlockedSlot -> "Unavailable"
-                                                    matchingEvent != null -> "Workshop"
-                                                    else -> "Available"
-                                                },
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                color = when {
-                                                    isBookedByYou -> Color(0xFF27AE60)
-                                                    isBookedByPeer -> Color.Gray
-                                                    isBlockedSlot -> Color.Red
-                                                    matchingEvent != null -> MaterialTheme.colorScheme.primary
-                                                    else -> MaterialTheme.colorScheme.primary
-                                                }
+                                                text = className,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.Black
                                             )
                                         }
-                                    }
 
-                                    Spacer(modifier = Modifier.height(10.dp))
+                                        Spacer(modifier = Modifier.height(12.dp))
 
-                                    // Class / Lesson Title & Details
-                                    Text(
-                                        text = className,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.Black
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = classDesc,
-                                        fontSize = 11.sp,
-                                        color = Color.DarkGray,
-                                        lineHeight = 15.sp
-                                    )
-
-                                    Spacer(modifier = Modifier.height(12.dp))
-
-                                    // Large Action Buttons providing excellent 48dp+ Tap Targets
-                                    if (isTeacherMode) {
-                                        if (isBookedByPeer || isBookedByYou) {
-                                            Row(
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Button(
-                                                    onClick = { alertMessage = "Connecting secure Video classroom call with student..." },
-                                                    shape = RoundedCornerShape(12.dp),
-                                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                                    modifier = Modifier
-                                                        .weight(1.2f)
-                                                        .height(44.dp)
-                                                ) {
-                                                    Text("Join Video call 📹", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                }
-                                                OutlinedButton(
-                                                    onClick = { alertMessage = "Opening secure peer communication portal..." },
-                                                    shape = RoundedCornerShape(12.dp),
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .height(44.dp)
-                                                ) {
-                                                    Text("Message", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                }
-                                            }
-                                        } else {
-                                            Button(
-                                                onClick = {
-                                                    blockedSlots = if (isBlockedSlot) {
-                                                        blockedSlots - timingString
-                                                    } else {
-                                                        blockedSlots + timingString
-                                                    }
-                                                },
-                                                shape = RoundedCornerShape(12.dp),
-                                                colors = ButtonDefaults.buttonColors(containerColor = if (isBlockedSlot) MaterialTheme.colorScheme.primary else Color(0xFFC0392B)),
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .height(44.dp)
-                                            ) {
-                                                Text(if (isBlockedSlot) "Unblock Intake Space" else "Block Intake Space 🚫", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                            }
-                                        }
-                                    } else {
-                                        when {
-                                            matchingEvent != null -> {
-                                                if (matchingEvent.isUserRsvped) {
-                                                    Button(
-                                                        onClick = { alertMessage = "Connecting to the live interactive video/audio workshop on Wisdom Bridge..." },
-                                                        shape = RoundedCornerShape(12.dp),
-                                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF27AE60)),
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .height(44.dp)
-                                                    ) {
-                                                        Text("Enter Workshop 📹", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                    }
+                                        Button(
+                                            onClick = {
+                                                val bookingTargetExpertId = if (expertId == "common_calendar") {
+                                                    slotCategoryExpert?.id ?: "exp_seed_maths_1"
                                                 } else {
-                                                    Button(
-                                                        onClick = { 
-                                                            viewModel.toggleEventRsvp(matchingEvent.id)
-                                                            bookingSuccessData = BookingConfirmationData(
-                                                                expertName = matchingEvent.hostName,
-                                                                title = matchingEvent.title,
-                                                                timing = matchingEvent.localTime,
-                                                                category = matchingEvent.communityName,
-                                                                emoji = "🎉",
-                                                                isReschedule = false
-                                                            )
-                                                        },
-                                                        shape = RoundedCornerShape(12.dp),
-                                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .height(44.dp)
-                                                    ) {
-                                                        Text("Book Workshop 🎟️", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                    }
+                                                    expertId
                                                 }
-                                            }
-
-                                            matchingBooking != null -> {
-                                                Row(
-                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                    modifier = Modifier.fillMaxWidth()
-                                                ) {
-                                                    val isJoinedState = matchingBooking.status == "Joined"
-                                                    Button(
-                                                        onClick = { 
-                                                            viewModel.joinBooking(matchingBooking.id)
-                                                            alertMessage = "Joined classes successfully! Ready to learn."
-                                                        },
-                                                        shape = RoundedCornerShape(12.dp),
-                                                        colors = ButtonDefaults.buttonColors(
-                                                            containerColor = if (isJoinedState) Color(0xFF2E7D32) else Color(0xFF8B1A1A)
-                                                        ),
-                                                        modifier = Modifier
-                                                            .weight(1.2f)
-                                                            .height(44.dp)
-                                                    ) {
-                                                        Text(if (isJoinedState) "Joined ✓" else "Enter Class 📹", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                    }
-                                                    OutlinedButton(
-                                                        onClick = {
-                                                            viewModel.openScheduler(matchingBooking.expertId, matchingBooking.id)
-                                                        },
-                                                        shape = RoundedCornerShape(12.dp),
-                                                        modifier = Modifier
-                                                            .weight(1f)
-                                                            .height(44.dp)
-                                                    ) {
-                                                        Text("Reschedule", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                    }
-                                                }
-                                            }
-
-                                            isBookedByPeer -> {
-                                                OutlinedButton(
-                                                    onClick = { alertMessage = "Success! You will be notified instantly if this slot becomes vacant." },
-                                                    shape = RoundedCornerShape(12.dp),
-                                                    border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.primary),
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .height(44.dp)
-                                                ) {
-                                                    Text("Notify Me If Empty 🔔", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
-                                                }
-                                            }
-
-                                            isBlockedSlot -> {
-                                                Text(
-                                                    text = "🚫 The tutor is currently offline or busy during this timeframe.",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = Color.Red.copy(alpha = 0.7f)
-                                                )
-                                            }
-
-                                            else -> {
-                                                if (expertId == "common_calendar") {
-                                                    OutlinedButton(
-                                                        onClick = {
-                                                            if (slotCategoryExpert != null) {
-                                                                selectedExpertForProfileState = slotCategoryExpert
-                                                            }
-                                                        },
-                                                        shape = RoundedCornerShape(12.dp),
-                                                        border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.primary),
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .height(44.dp)
-                                                    ) {
-                                                        Text("Book 1:1 Slot with Mentor 📚", fontSize = 11.5.sp, fontWeight = FontWeight.ExtraBold)
-                                                    }
-                                                } else {
-                                                    if (rescheduleBookingId != null) {
-                                                        Button(
-                                                            onClick = {
-                                                                if (rescheduleBookingId != null) {
-                                                                viewModel.rescheduleBooking(rescheduleBookingId, timingString, onComplete = {
-                                                                    bookingSuccessData = BookingConfirmationData(
-                                                                        expertName = expert?.name ?: "Mentor",
-                                                                        title = expert?.title ?: "Expert Guide",
-                                                                        timing = timingString,
-                                                                        category = expert?.category ?: "LEARN & GROW",
-                                                                        emoji = when (expert?.category?.uppercase()) {
-                                                                            "LEARN & GROW" -> "📚"
-                                                                            "HEALTH & WELLNESS" -> "🌿"
-                                                                            "ARTS, MUSIC & CULTURE" -> "🎨"
-                                                                            "NATURE & LIFESTYLE" -> "🌱"
-                                                                            else -> "📚"
-                                                                        },
-                                                                        isReschedule = true
-                                                                    )
-                                                                })
-                                                            } else {
-                                                                showBookingConfirmationBySlot = timingString
-                                                            }
-                                                        },
-                                                        shape = RoundedCornerShape(12.dp),
-                                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .height(44.dp)
-                                                    ) {
-                                                        Text(
-                                                            text = "Confirm Reschedule Slot",
-                                                            fontSize = 11.5.sp,
-                                                            fontWeight = FontWeight.ExtraBold
-                                                        )
-                                                    }
-                                                    } else {
-                                                        Text(
-                                                            text = "💡 Tap 'Find Expert' on Home Screen to schedule from verified mentors.",
-                                                            style = MaterialTheme.typography.bodySmall,
-                                                            color = Color.Gray,
-                                                            fontWeight = FontWeight.Medium,
-                                                            modifier = Modifier.padding(vertical = 4.dp)
-                                                        )
-                                                    }
-                                                }
-                                            }
+                                                showBookingConfirmationBySlot = Pair(bookingTargetExpertId, timingString)
+                                            },
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(44.dp)
+                                                .testTag("book_this_slot_button_$index")
+                                        ) {
+                                            Text("Book this slot →", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }
@@ -16816,21 +16675,22 @@ fun PremiumBookingCalendarScreen(
     }
 
     if (showBookingConfirmationBySlot != null) {
-        val timing = showBookingConfirmationBySlot!!
+        val (targetExpertId, timing) = showBookingConfirmationBySlot!!
+        val targetExpert = experts.find { it.id == targetExpertId } ?: expert
         AlertDialog(
             onDismissRequest = { showBookingConfirmationBySlot = null },
             title = { Text("Confirm Appointment Session 🤝", fontWeight = FontWeight.Bold) },
-            text = { Text("Would you like to finalize booking a 1:1 Live Lesson with ${expert?.name ?: "Mentor"} on $timing? Chachi will register the slot instantly.") },
+            text = { Text("Would you like to finalize booking a 1:1 Live Lesson with ${targetExpert?.name ?: "Mentor"} on $timing? Chachi will register the slot instantly.") },
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.bookSessionWithExpert(expertId, timing, isVideo = true, onComplete = {
+                        viewModel.bookSessionWithExpert(targetExpertId, timing, isVideo = true, onComplete = {
                             bookingSuccessData = BookingConfirmationData(
-                                expertName = expert?.name ?: "Mentor",
-                                title = expert?.title ?: "Expert Guide",
+                                expertName = targetExpert?.name ?: "Mentor",
+                                title = targetExpert?.title ?: "Expert Guide",
                                 timing = timing,
-                                category = expert?.category ?: "LEARN & GROW",
-                                emoji = when (expert?.category?.uppercase()) {
+                                category = targetExpert?.category ?: "LEARN & GROW",
+                                emoji = when (targetExpert?.category?.uppercase()) {
                                     "LEARN & GROW" -> "📚"
                                     "HEALTH & WELLNESS" -> "🌿"
                                     "ARTS, MUSIC & CULTURE" -> "🎨"
@@ -17026,6 +16886,232 @@ fun PremiumBookingCalendarScreen(
                 },
                 onFollowToggle = { viewModel.toggleFollowExpert(expert.id) }
             )
+        }
+
+        activeRescheduleBookingId?.let { bookingId ->
+            val bookingToReschedule = bookingsList.find { it.id == bookingId }
+            val rescheduleExpert = experts.find { it.id == bookingToReschedule?.expertId } ?: expert
+
+            var rescheduleSelectedDay by remember(bookingId) { mutableStateOf(selectedDay) }
+            var rescheduleSelectedSlot by remember(bookingId) { mutableStateOf("10:00 AM") }
+
+            // Scrim dim background covering the screen
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .clickable { activeRescheduleBookingId = null }
+                    .zIndex(90f)
+            )
+
+            // Animated slide up bottom sheet container
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(95f),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                // Bottom Sheet Panel with subtle shadow and white background
+                Card(
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = false) { }
+                        .navigationBarsPadding()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp)
+                    ) {
+                        // Drag Handle
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .size(width = 40.dp, height = 4.dp)
+                                .background(Color.LightGray, RoundedCornerShape(2.dp))
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        
+                        // Header: Expert name + avatar + close button
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(modifier = Modifier.size(56.dp)) {
+                                ProceduralLinkedInAvatar(
+                                    name = rescheduleExpert?.name ?: "Mentor",
+                                    sizeDp = 56,
+                                    modifier = Modifier.clip(CircleShape).background(Color.White)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Reschedule Appointment",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF6200EE)
+                                )
+                                Text(
+                                    text = rescheduleExpert?.name ?: "Mentor",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black
+                                )
+                                Text(
+                                    text = rescheduleExpert?.title ?: "Expert Guide",
+                                    fontSize = 12.sp,
+                                    color = Color.Gray,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            IconButton(
+                                onClick = { activeRescheduleBookingId = null },
+                                modifier = Modifier.testTag("close_reschedule_sheet")
+                            ) {
+                                Text("✕", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                            }
+                        }
+
+                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Full month grid (next 28 days in rows of 7 columns)
+                        Text(
+                            text = "Select New Date • Calendar Month Grid",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black,
+                            modifier = Modifier.padding(bottom = 10.dp)
+                        )
+
+                        val todayDate = remember { java.time.LocalDate.now() }
+                        val days28 = remember {
+                            (0..27).map { todayDate.plusDays(it.toLong()) }
+                        }
+                        val weeks = days28.chunked(7)
+
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            weeks.forEach { week ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    week.forEach { date ->
+                                        val dayOfWeekShort = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()).uppercase().take(3)
+                                        val isSelected = rescheduleSelectedDay == dayOfWeekShort
+                                        
+                                        Box(
+                                            modifier = Modifier
+                                                .size(width = 44.dp, height = 48.dp)
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(if (isSelected) Color(0xFFECE5FD) else Color.Transparent)
+                                                .clickable { rescheduleSelectedDay = dayOfWeekShort }
+                                                .padding(4.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Text(dayOfWeekShort.take(1), fontSize = 9.sp, color = if (isSelected) Color(0xFF6200EE) else Color.Gray, fontWeight = FontWeight.Bold)
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = date.dayOfMonth.toString(),
+                                                    fontSize = if (isSelected) 14.sp else 12.sp,
+                                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                                                    color = if (isSelected) Color(0xFF6200EE) else Color.DarkGray
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        // Hour slots as green/grey chips
+                        Text(
+                            text = "Select New Available Hour",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(vertical = 4.dp)
+                        ) {
+                            items(standardSlots.size) { slotIdx ->
+                                val slotPair = standardSlots[slotIdx]
+                                val startTime = slotPair.first
+                                val isSelectedSlot = rescheduleSelectedSlot == startTime
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(if (isSelectedSlot) Color(0xFF2ECC71) else Color(0xFFF1F5F9))
+                                        .clickable { rescheduleSelectedSlot = startTime }
+                                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                                        .testTag("reschedule_chip_$slotIdx")
+                                ) {
+                                    Text(
+                                        text = startTime,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelectedSlot) Color.White else Color.DarkGray
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        // "Confirm Reschedule" Button
+                        Button(
+                            onClick = {
+                                val selectedSlotPair = standardSlots.find { it.first == rescheduleSelectedSlot } ?: standardSlots[0]
+                                val newTimingString = "$rescheduleSelectedDay • ${selectedSlotPair.first} - ${selectedSlotPair.second}"
+                                if (bookingToReschedule != null) {
+                                    viewModel.rescheduleBooking(bookingToReschedule.id, newTimingString, onComplete = {
+                                        bookingSuccessData = BookingConfirmationData(
+                                            expertName = rescheduleExpert?.name ?: "Mentor",
+                                            title = rescheduleExpert?.title ?: "Expert Guide",
+                                            timing = newTimingString,
+                                            category = rescheduleExpert?.category ?: "LEARN & GROW",
+                                            emoji = when (rescheduleExpert?.category?.uppercase()) {
+                                                "LEARN & GROW" -> "📚"
+                                                "HEALTH & WELLNESS" -> "🌿"
+                                                "ARTS, MUSIC & CULTURE" -> "🎨"
+                                                "NATURE & LIFESTYLE" -> "🌱"
+                                                else -> "📚"
+                                            },
+                                            isReschedule = true
+                                        )
+                                    })
+                                }
+                                activeRescheduleBookingId = null
+                            },
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .testTag("confirm_reschedule_button")
+                        ) {
+                            Text("Confirm Reschedule", fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -17672,13 +17758,16 @@ fun ModifyBookingDialog(
                         )
 
                         val slotsForSelectedDay = remember(selectedDayKey) {
-                            listOf(
-                                "9:00 AM - 9:30 AM",
-                                "11:00 AM - 11:30 AM",
-                                "2:00 PM - 2:30 PM",
-                                "4:00 PM - 4:30 PM",
-                                "6:00 PM - 6:30 PM"
-                            )
+                            (6..21).map { hour ->
+                                val ampm = if (hour < 12) "AM" else "PM"
+                                val h = if (hour % 12 == 0) 12 else hour % 12
+                                val formattedHour = String.format("%02d:00 %s", h, ampm)
+                                val endHour = hour + 1
+                                val endAmpm = if (endHour < 12 || endHour == 24) "AM" else "PM"
+                                val eh = if (endHour % 12 == 0) 12 else endHour % 12
+                                val formattedEndHour = String.format("%02d:00 %s", eh, endAmpm)
+                                "$formattedHour - $formattedEndHour"
+                            }
                         }
 
                         Row(

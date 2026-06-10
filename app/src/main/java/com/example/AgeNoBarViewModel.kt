@@ -2672,126 +2672,49 @@ class AgeNoBarViewModel : ViewModel() {
         )
 
         val categorySpecs = listOf(
-            Pair("science", listOf("physics", "chemistry", "biology", "botany", "zoology", "nature_life_sciences", "environmental_science")),
+            Pair("science", listOf("physics", "chemistry", "biology", "botany", "zoology", "nature_life_sciences", "environmental_science", "technology", "digital_skills")),
             Pair("maths", listOf("algebra", "vedic_maths", "board_prep", "calculus", "statistics", "jee_preparation")),
-            Pair("languages", listOf("hindi", "tamil", "french", "malayalam", "sanskrit", "kannada", "telugu", "english_speaking")),
-            Pair("career", listOf("career_counselling", "interview_coaching", "resume_building", "corporate_mentoring", "startup_guidance", "government_exam_coaching")),
-            Pair("banking_finance", listOf("retail_banking", "branch_management", "investment_planning", "fixed_deposits", "loan_guidance", "retirement_planning")),
-            Pair("ayurveda", listOf("kerala_ayurveda", "panchakarma", "ayurvedic_nutrition", "herbal_medicine", "ayurvedic_consultation", "naturopathy")),
-            Pair("dance", listOf("bharatanatyam", "kuchipudi", "kathak", "odissi", "mohiniyattam", "manipuri", "folk_dance")),
-            Pair("music", listOf("carnatic_vocal", "hindustani_vocal", "carnatic_instrumental", "hindustani_instrumental", "bhajans_devotional", "light_music", "film_songs")),
-            Pair("physiotherapy", listOf("orthopaedic_physio", "neurological_physio", "sports_physio", "geriatric_physio", "cardiac_physio", "paediatric_physio", "post_surgery_rehab", "joint_specialist", "spine_specialist"))
+            Pair("languages", listOf("sanskrit", "hindi", "kannada", "tamil", "telugu", "malayalam", "english", "french", "german")),
+            Pair("career", listOf("career_guidance", "interview_preparation", "entrepreneurship")),
+            Pair("banking_finance", listOf("retail_banking", "branch_management", "investment_planning", "fixed_deposits", "loan_guidance", "retirement_planning", "finance", "banking")),
+            Pair("legal", listOf("legal_guidance")),
+            Pair("health_wellness", listOf("ayurveda", "meditation", "yoga", "nutrition", "physiotherapy", "counselling", "mental_wellness", "healthy_ageing", "breathing_practices")),
+            Pair("arts_culture", listOf(
+                "carnatic_vocal", "hindustani_vocal", "bhajans", "devotional_music", "veena", "violin", "flute", "mridangam",
+                "bharatanatyam", "kuchipudi", "kathak", "odissi", "mohiniyattam",
+                "tanjore_painting", "kalamkari", "rangoli", "traditional_crafts"
+            )),
+            Pair("recipes_traditions", listOf(
+                "south_indian_recipes", "north_indian_recipes", "festival_recipes", "traditional_cooking", "temple_prasadam_recipes", "vegetarian_cooking", "vegan_cooking", "regional_cuisines", "family_recipes", "traditional_sweets", "pickles_preserves"
+            )),
+            Pair("stories_heritage", listOf(
+                "ramayana", "mahabharata", "bhagavad_gita", "panchatantra", "moral_stories", "bedtime_stories", "grandparent_storytelling", "regional_folktales", "devotional_stories", "sanskrit_stories"
+            )),
+            Pair("nature_lifestyle", listOf(
+                "gardening", "terrace_gardening", "balcony_gardening", "indoor_gardening", "organic_farming", "vertical_gardening", "bonsai", "composting", "sustainable_living", "kitchen_gardening"
+            ))
         )
 
         fun getSpecialisationDisplay(category: String, spec: String, expertIdx: Int): String {
+            val suffix = when (expertIdx % 3) {
+                0 -> "Senior Specialist"
+                1 -> "Consultant"
+                else -> "Acharya"
+            }
+            val formattedSpec = spec.replace("_", " ").split(' ').joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
             return when (category) {
-                "career" -> {
-                    when (expertIdx % 5) {
-                        0 -> "Retired HR Head from TCS/Infosys"
-                        1 -> "Ex-IAS officer career guidance"
-                        2 -> "Retired Army officer career transition"
-                        3 -> "Ex-corporate trainer"
-                        4 -> "Retired university professor"
-                        else -> "Career Consultant"
-                    }
-                }
-                "banking_finance" -> {
-                    when (expertIdx % 5) {
-                        0 -> "Retired Branch Manager, SBI"
-                        1 -> "Retired Chief Manager, Bank of Baroda"
-                        2 -> "Retired Senior Manager, Punjab National Bank"
-                        3 -> "Ex-RBI officer"
-                        4 -> "Retired LIC branch manager"
-                        else -> "Banking & Finance Expert"
-                    }
-                }
-                "ayurveda" -> {
-                    when (spec) {
-                        "kerala_ayurveda" -> "Kerala Ayurvedic Doctor (BAMS)"
-                        "panchakarma" -> "Panchakarma specialist from Thrissur"
-                        "ayurvedic_nutrition" -> "Ayurvedic nutrition consultant"
-                        "herbal_medicine" -> "Senior Ayurvedic Herbologist"
-                        "ayurvedic_consultation" -> "Ayurvedic Consultation (BAMS)"
-                        "naturopathy" -> "Traditional Naturopathy Expert"
-                        else -> "Ayurveda Doctor (BAMS)"
-                    }
-                }
-                "dance" -> {
-                    val base = when (spec) {
-                        "bharatanatyam" -> "Bharatanatyam Instructor"
-                        "kuchipudi" -> "Kuchipudi Acharya"
-                        "kathak" -> "Kathak Teacher"
-                        "odissi" -> "Odissi Dancer"
-                        "mohiniyattam" -> "Mohiniyattam Guru"
-                        "manipuri" -> "Manipuri exponent"
-                        "folk_dance" -> "Folk Dance Instructor"
-                        else -> "Dance Acharya"
-                    }
-                    if (expertIdx == 0) "$base · Kalakshetra" else base
-                }
-                "music" -> {
-                    when (spec) {
-                        "carnatic_vocal" -> "Carnatic Vocal · Grade 8 Trinity"
-                        "hindustani_vocal" -> "Hindustani Classical Vocal Guru"
-                        "carnatic_instrumental" -> "Carnatic Violinist"
-                        "hindustani_instrumental" -> "Hindustani Sitar Master"
-                        "bhajans_devotional" -> "Devotional Bhajan Guide"
-                        "light_music" -> "Light Music & Vocal Coach"
-                        "film_songs" -> "Classical Retro Film Melodies"
-                        else -> "Classical Music Guru"
-                    }
-                }
-                "physiotherapy" -> {
-                    when (spec) {
-                        "orthopaedic_physio" -> "Orthopaedic Physiotherapist"
-                        "neurological_physio" -> "Neurological Stroke rehab specialist"
-                        "sports_physio" -> "Sports Injury Physiotherapist"
-                        "geriatric_physio" -> "Senior Care Geriatric Physiotherapist"
-                        "cardiac_physio" -> "Cardiac Post-op physio specialist"
-                        "paediatric_physio" -> "Children's physical rehab coach"
-                        "post_surgery_rehab" -> "Post-Surgery joint restoration tutor"
-                        "joint_specialist" -> "Knee and Shoulder joint specialist"
-                        "spine_specialist" -> "Spinal Decompression specialist"
-                        else -> "Senior Physiotherapy Specialist"
-                    }
-                }
-                "science" -> {
-                    when (spec) {
-                        "physics" -> "High School Physics Teacher"
-                        "chemistry" -> "Chemistry Laboratory Tutor"
-                        "biology" -> "Biology & Botany Coach"
-                        "botany" -> "Plant & Botany Specialist"
-                        "zoology" -> "Fauna & Zoology Expert"
-                        "nature_life_sciences" -> "Nature & Life Sciences Guide"
-                        "environmental_science" -> "Eco Systems & Environmental Scientist"
-                        else -> "Science Educator"
-                    }
-                }
-                "maths" -> {
-                    when (spec) {
-                        "algebra" -> "Algebra & Geometry Mentor"
-                        "vedic_maths" -> "Vedic Mathematics Guru"
-                        "board_prep" -> "Board Examination Math Coach"
-                        "calculus" -> "Applied Calculus Teacher"
-                        "statistics" -> "Probability & Statistics Advisor"
-                        "jee_preparation" -> "IIT-JEE Advanced Mathematics Coach"
-                        else -> "Vedic Maths Guru"
-                    }
-                }
-                "languages" -> {
-                    when (spec) {
-                        "hindi" -> "Hindi Sahitya Literature Guide"
-                        "tamil" -> "Classical Tamil Language Guru"
-                        "french" -> "Conversational French Coach"
-                        "malayalam" -> "Malayalam Language Advisor"
-                        "sanskrit" -> "Sanskrit Grammar & Sloka scholar"
-                        "kannada" -> "Kannada Bhasha Literature Scholar"
-                        "telugu" -> "Fluent Telugu Vocabulary Tutor"
-                        "english_speaking" -> "Interactive English Speaking Coach"
-                        else -> "Heritage Language Scholar"
-                    }
-                }
-                else -> "Specialised Mentor"
+                "science" -> "$formattedSpec Educator"
+                "maths" -> "$formattedSpec Specialist"
+                "languages" -> "$formattedSpec Tutor" 
+                "career" -> "$formattedSpec Adviser"
+                "banking_finance" -> "$formattedSpec Expert"
+                "legal" -> "$formattedSpec Counselor"
+                "health_wellness" -> "$formattedSpec Practitioner"
+                "arts_culture" -> "$formattedSpec Guru"
+                "recipes_traditions" -> "$formattedSpec Culinary Expert"
+                "stories_heritage" -> "$formattedSpec Storyteller"
+                "nature_lifestyle" -> "$formattedSpec Consultant"
+                else -> "$formattedSpec $suffix"
             }
         }
 
@@ -2822,10 +2745,12 @@ class AgeNoBarViewModel : ViewModel() {
                         "languages" -> "Dedicated to preserving our ancestral roots, classical literature, grammar, and fluent talking style."
                         "career" -> "Guiding corporate aspirants and competitive preparation strategies based on real professional success."
                         "banking_finance" -> "Helping senior citizens secure their savings certificates, resolve banking claims, and manage investments."
-                        "ayurveda" -> "Helping families integrate traditional wellness diet systems, seasonal detox guidelines, and herbal wisdom."
-                        "dance" -> "Nurturing aesthetic choreography rhythms, posture control, and cultural classical dances."
-                        "music" -> "Sharing the peaceful vibrations of classical melodies and sacred devotion."
-                        "physiotherapy" -> "Restoring active mobility, healing spinal decompression pain, and therapeutic rehab."
+                        "legal" -> "Empowering citizens with legal awareness, property documentation, and public advocacy."
+                        "health_wellness" -> "Helping families integrate traditional wellness, herbal remedies, breathing techniques, and somatic relaxation."
+                        "arts_culture" -> "Practicing and teaching traditional arts, vocal music, instruments, and classical dance forms with pure devotion."
+                        "recipes_traditions" -> "Sharing culinary kitchen secrets, healthy festival recipes, pickles, and traditional Indian cuisines."
+                        "stories_heritage" -> "Sharing the grand epics, regional lore, Pauranik wisdom, and moral bedtime stories to keep roots alive."
+                        "nature_lifestyle" -> "Nurturing balcony gardening, vermiculture, terrace farms, and sustainable home lifestyle habits."
                         else -> "Providing specialized mentoring and heritage knowledge with warmth and care."
                     }
                     
@@ -2835,10 +2760,12 @@ class AgeNoBarViewModel : ViewModel() {
                         "languages" -> "🗣️"
                         "career" -> "💼"
                         "banking_finance" -> "🏦"
-                        "ayurveda" -> "🌿"
-                        "dance" -> "💃"
-                        "music" -> "🎵"
-                        "physiotherapy" -> "🦾"
+                        "legal" -> "⚖️"
+                        "health_wellness" -> "❤️"
+                        "arts_culture" -> "🎭"
+                        "recipes_traditions" -> "🍲"
+                        "stories_heritage" -> "📖"
+                        "nature_lifestyle" -> "🌿"
                         else -> "🎓"
                     }
                     

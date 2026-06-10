@@ -13637,6 +13637,144 @@ fun TopicVisualCard(
     }
 }
 
+fun mapSubExperienceToFilters(subExp: SubExperience): Pair<String, String> {
+    val name = subExp.name.uppercase()
+    return when {
+        // Nature & Lifestyle
+        name.contains("GARDENING") -> Pair("nature_lifestyle", "gardening")
+        name.contains("TERRACE") -> Pair("nature_lifestyle", "terrace_gardening")
+        name.contains("ORGANIC") -> Pair("nature_lifestyle", "organic_farming")
+        name.contains("INDOOR") -> Pair("nature_lifestyle", "indoor_gardening")
+        name.contains("BONSAI") -> Pair("nature_lifestyle", "bonsai")
+        
+        // Learn & Grow
+        name.contains("TEACHER") || name.contains("MENTOR") -> Pair("languages", "All")
+        name.contains("COACHING") -> Pair("career", "career_guidance")
+        name.contains("INTERVIEW") -> Pair("career", "interview_preparation")
+        name.contains("FINANCE") -> Pair("banking_finance", "finance")
+        name.contains("RETIREMENT") -> Pair("banking_finance", "retirement_planning")
+        name.contains("LEGAL") -> Pair("legal", "legal_guidance")
+        name.contains("SCIENCE") -> Pair("science", "All")
+        
+        // Health & Wellness
+        name.contains("AYURVEDA") -> Pair("health_wellness", "ayurveda")
+        name.contains("YOGA") -> Pair("health_wellness", "yoga")
+        name.contains("MEDITATION") -> Pair("health_wellness", "meditation")
+        name.contains("PHYSIO") -> Pair("health_wellness", "physiotherapy")
+        name.contains("AGING") || name.contains("AGEING") -> Pair("health_wellness", "healthy_ageing")
+        name.contains("NUTRITION") -> Pair("health_wellness", "nutrition")
+        
+        // Recipes & Traditions
+        name.contains("CUISINE") || name.contains("COOKING") -> Pair("recipes_traditions", "traditional_cooking")
+        name.contains("FESTIVAL") -> Pair("recipes_traditions", "festival_recipes")
+        name.contains("TRADITIONS") -> Pair("recipes_traditions", "family_recipes")
+        
+        // Arts & Culture
+        name.contains("CARNATIC") -> Pair("arts_culture", "carnatic_vocal")
+        name.contains("HINDUSTANI") -> Pair("arts_culture", "hindustani_vocal")
+        name.contains("BHAJAN") -> Pair("arts_culture", "bhajans")
+        name.contains("INSTRUMENT") -> Pair("arts_culture", "violin")
+        name.contains("DANCE") -> Pair("arts_culture", "bharatanatyam")
+        name.contains("ART") -> Pair("arts_culture", "tanjore_painting")
+        
+        // Stories & Heritage
+        name.contains("PANCHATANTRA") -> Pair("stories_heritage", "panchatantra")
+        name.contains("SANSKRIT") -> Pair("stories_heritage", "sanskrit_stories")
+        name.contains("RAMAYANA") -> Pair("stories_heritage", "ramayana")
+        name.contains("MAHABHARATA") -> Pair("stories_heritage", "mahabharata")
+        name.contains("DEVOTIONAL") -> Pair("stories_heritage", "devotional_stories")
+        name.contains("STORY") -> Pair("stories_heritage", "moral_stories")
+        else -> Pair("All", "All")
+    }
+}
+
+fun isSubExperienceSelected(subExp: SubExperience, high: String, spec: String): Boolean {
+    val (mappedHigh, mappedSpec) = mapSubExperienceToFilters(subExp)
+    if (mappedHigh == "All" && high == "All" && spec == "All") return true
+    return high == mappedHigh && (mappedSpec == "All" || spec == mappedSpec)
+}
+
+@Composable
+fun CompactSubExperienceSliderCard(
+    subExp: SubExperience,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .width(115.dp)
+            .height(72.dp)
+            .shadow(
+                elevation = 4.dp,
+                shape = RoundedCornerShape(18.dp),
+                clip = false,
+                ambientColor = Color.Black.copy(alpha = 0.15f),
+                spotColor = Color.Black.copy(alpha = 0.25f)
+            )
+            .clickable(onClick = onClick)
+            .testTag("compact_sub_exp_card_${subExp.name.lowercase().replace(" ", "_")}"),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        border = BorderStroke(
+            width = if (isSelected) 3.dp else 1.dp,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.2f)
+        )
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Image(
+                painter = painterResource(id = subExp.imageRes),
+                contentDescription = subExp.name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Soft dark overlay
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.15f),
+                                Color.Black.copy(alpha = 0.70f)
+                            )
+                        )
+                    )
+            )
+
+            // Subcategory label (emoji + name in vertical layout)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Box(
+                    modifier = Modifier
+                        .background(Color.White.copy(alpha = 0.25f), CircleShape)
+                        .size(20.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = subExp.emoji,
+                        fontSize = 11.sp
+                    )
+                }
+
+                Text(
+                    text = subExp.name,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun CategoryDetailScreen(
     category: MainCategory,
@@ -13693,28 +13831,32 @@ fun CategoryDetailScreen(
     // Dynamic Filter helper functions
     fun getHighLevelCategoryName(cat: String): String {
         return when (cat) {
-            "science" -> "Science 🔬"
-            "maths" -> "Maths 📐"
+            "science" -> "Science & Tech 🔬"
+            "maths" -> "Mathematics 📐"
             "languages" -> "Languages 🗣️"
-            "career" -> "Career & Growth 💼"
-            "banking_finance" -> "Banking & Finance 💰"
-            "ayurveda" -> "Ayurveda Wellness 🌿"
-            "dance" -> "Indian Classical Dance 💃"
-            "music" -> "Music & Vocals 🎵"
-            "physiotherapy" -> "Physiotherapy Rehab 🦵"
+            "career" -> "Career Guidance 💼"
+            "banking_finance" -> "Finance & Banking 🏦"
+            "legal" -> "Legal Guidance ⚖️"
+            "health_wellness" -> "Health & Wellness ❤️"
+            "arts_culture" -> "Arts & Culture 🎭"
+            "recipes_traditions" -> "Recipes & Traditions 🍲"
+            "stories_heritage" -> "Stories & Heritage 📖"
+            "nature_lifestyle" -> "Nature & Lifestyle 🌿"
             else -> cat.replace("_", " ").replaceFirstChar { it.uppercase() }
         }
     }
 
     fun getSpecialisationDisplayName(spec: String): String {
         return when (spec) {
-            "physics" -> "Physics"
-            "chemistry" -> "Chemistry"
-            "biology" -> "Biology"
-            "botany" -> "Botany"
-            "zoology" -> "Zoology"
+            "physics" -> "Physics 🔬"
+            "chemistry" -> "Chemistry 🧪"
+            "biology" -> "Biology 🧬"
+            "botany" -> "Botany 🌿"
+            "zoology" -> "Zoology 🦁"
             "nature_life_sciences" -> "Nature & Life"
             "environmental_science" -> "Environmental"
+            "technology" -> "Technology 💻"
+            "digital_skills" -> "Digital Skills 📱"
             
             "algebra" -> "Algebra"
             "vedic_maths" -> "Vedic Maths"
@@ -13723,21 +13865,19 @@ fun CategoryDetailScreen(
             "statistics" -> "Statistics"
             "jee_preparation" -> "JEE Prep"
             
-            "hindi" -> "Hindi"
-            "tamil" -> "Tamil"
-            "french" -> "French"
-            "malayalam" -> "Malayalam"
-            "sanskrit" -> "Sanskrit"
-            "kannada" -> "Kannada"
-            "telugu" -> "Telugu"
-            "english_speaking" -> "English Speaking"
+            "sanskrit" -> "Sanskrit 🕉️"
+            "hindi" -> "Hindi 🇮🇳"
+            "kannada" -> "Kannada 💛"
+            "tamil" -> "Tamil ❤️"
+            "telugu" -> "Telugu 🧡"
+            "malayalam" -> "Malayalam 💚"
+            "english" -> "English 🇬🇧"
+            "french" -> "French 🇫🇷"
+            "german" -> "German 🇩🇪"
             
-            "career_counselling" -> "Counselling"
-            "interview_coaching" -> "Interview Prep"
-            "resume_building" -> "Resume Prep"
-            "corporate_mentoring" -> "Corporate"
-            "startup_guidance" -> "Startups"
-            "government_exam_coaching" -> "Govt Exams"
+            "career_guidance" -> "Career Guidance 💼"
+            "interview_preparation" -> "Interview Prep 📝"
+            "entrepreneurship" -> "Entrepreneurship 🚀"
             
             "retail_banking" -> "Retail Banking"
             "branch_management" -> "Branch Management"
@@ -13745,52 +13885,85 @@ fun CategoryDetailScreen(
             "fixed_deposits" -> "Fixed Deposits"
             "loan_guidance" -> "Loans"
             "retirement_planning" -> "Retirement Plans"
+            "finance" -> "Finance 💰"
+            "banking" -> "Banking 🏦"
             
-            "kerala_ayurveda" -> "Kerala Ayurveda"
-            "panchakarma" -> "Panchakarma"
-            "ayurvedic_nutrition" -> "Diet & Herb"
-            "herbal_medicine" -> "Herbs"
-            "ayurvedic_consultation" -> "Consultation"
-            "naturopathy" -> "Naturopathy"
+            "legal_guidance" -> "Legal Guidance ⚖️"
             
-            "bharatanatyam" -> "Bharatanatyam"
-            "kuchipudi" -> "Kuchipudi"
-            "kathak" -> "Kathak"
-            "odissi" -> "Odissi"
-            "mohiniyattam" -> "Mohiniyattam"
-            "manipuri" -> "Manipuri"
-            "folk_dance" -> "Folk Dance"
+            "ayurveda" -> "Ayurveda 🌿"
+            "meditation" -> "Meditation 🧘"
+            "yoga" -> "Yoga 🧘‍♂️"
+            "nutrition" -> "Nutrition 🍎"
+            "physiotherapy" -> "Physiotherapy 🦵"
+            "counselling" -> "Counselling 🌸"
+            "mental_wellness" -> "Mental Wellness 🧠"
+            "healthy_ageing" -> "Healthy Ageing 👴"
+            "breathing_practices" -> "Breathing (Pranayama) 🫁"
             
-            "carnatic_vocal" -> "Carnatic Vocal"
-            "hindustani_vocal" -> "Hindustani Vocal"
-            "carnatic_instrumental" -> "Carnatic Violin"
-            "hindustani_instrumental" -> "Hindustani Sitar"
-            "bhajans_devotional" -> "Bhajans / Chants"
-            "light_music" -> "Light Music"
-            "film_songs" -> "Retro Film"
+            "carnatic_vocal" -> "Carnatic Vocal 🎵"
+            "hindustani_vocal" -> "Hindustani Vocal 🎶"
+            "bhajans" -> "Bhajans 🙏"
+            "devotional_music" -> "Devotional Music 📿"
+            "veena" -> "Veena 🎻"
+            "violin" -> "Violin 🎻"
+            "flute" -> "Flute 🎋"
+            "mridangam" -> "Mridangam 🥁"
+            "bharatanatyam" -> "Bharatanatyam 💃"
+            "kuchipudi" -> "Kuchipudi 💃"
+            "kathak" -> "Kathak 💃"
+            "odissi" -> "Odissi 💃"
+            "mohiniyattam" -> "Mohiniyattam 💃"
+            "tanjore_painting" -> "Tanjore Painting 🎨"
+            "kalamkari" -> "Kalamkari 🎨"
+            "rangoli" -> "Rangoli 🌸"
+            "traditional_crafts" -> "Traditional Crafts 🏺"
             
-            "orthopaedic_physio" -> "Orthopaedic"
-            "neurological_physio" -> "Neurological"
-            "sports_physio" -> "Sports Injuries"
-            "geriatric_physio" -> "Geriatric care"
-            "cardiac_physio" -> "Cardiac Rehab"
-            "paediatric_physio" -> "Paediatric rehab"
-            "post_surgery_rehab" -> "Post Surgery"
-            "joint_specialist" -> "Knee & Shoulder"
-            "spine_specialist" -> "Spine & Pain"
+            "south_indian_recipes" -> "South Indian Recipes 🍲"
+            "north_indian_recipes" -> "North Indian Recipes 🍛"
+            "festival_recipes" -> "Festival Recipes 🥮"
+            "traditional_cooking" -> "Traditional Cooking 🍳"
+            "temple_prasadam_recipes" -> "Temple Prasadam 🍚"
+            "vegetarian_cooking" -> "Vegetarian Cooking 🥗"
+            "vegan_cooking" -> "Vegan Cooking 🌱"
+            "regional_cuisines" -> "Regional Cuisines 🗺️"
+            "family_recipes" -> "Family Recipes 📜"
+            "traditional_sweets" -> "Traditional Sweets 🍯"
+            "pickles_preserves" -> "Pickles & Preserves 🌶️"
+            
+            "ramayana" -> "Ramayana 🏹"
+            "mahabharata" -> "Mahabharata 🛡️"
+            "bhagavad_gita" -> "Bhagavad Gita 🕉️"
+            "panchatantra" -> "Panchatantra 🦁"
+            "moral_stories" -> "Moral Stories 📖"
+            "bedtime_stories" -> "Bedtime Stories 🌙"
+            "grandparent_storytelling" -> "Grandparent Storytelling 👵"
+            "regional_folktales" -> "Regional Folktales 🗣️"
+            "devotional_stories" -> "Devotional Stories 🙏"
+            "sanskrit_stories" -> "Sanskrit Stories 🕉️"
+            
+            "gardening" -> "Gardening 🌱"
+            "terrace_gardening" -> "Terrace Gardening 🪴"
+            "balcony_gardening" -> "Balcony Gardening 🪴"
+            "indoor_gardening" -> "Indoor Gardening 🌿"
+            "organic_farming" -> "Organic Farming 🌽"
+            "vertical_gardening" -> "Vertical Gardening 🪜"
+            "bonsai" -> "Bonsai 🌳"
+            "composting" -> "Composting 🚜"
+            "sustainable_living" -> "Sustainable Living ♻️"
+            "kitchen_gardening" -> "Kitchen Gardening 🧅"
             
             else -> spec.replace("_", " ").replaceFirstChar { it.uppercase() }
         }
     }
 
     val parentCategoryToHighLevelMap = when (category.name.uppercase()) {
-        "LEARN & GROW", "LEARN AND GROW" -> listOf("science", "maths", "languages", "career", "banking_finance")
-        "HEALTH & WELLNESS" -> listOf("ayurveda", "physiotherapy")
-        "RECIPES & TRADITIONS", "RECIPES AND TRADITIONS" -> listOf("ayurveda")
-        "ARTS, MUSIC & CULTURE", "ARTS & CULTURE", "ARTS, MUSIC AND CULTURE" -> listOf("dance", "music")
-        "STORIES & HERITAGE", "STORIES AND HERITAGE" -> listOf("languages")
-        "NATURE & LIFESTYLE", "NATURE AND LIFESTYLE" -> listOf("science")
-        else -> listOf("science", "maths", "languages", "career", "banking_finance", "ayurveda", "dance", "music", "physiotherapy")
+        "LEARN & GROW", "LEARN AND GROW" -> listOf("science", "maths", "languages", "career", "banking_finance", "legal")
+        "HEALTH & WELLNESS" -> listOf("health_wellness")
+        "RECIPES & TRADITIONS", "RECIPES AND TRADITIONS" -> listOf("recipes_traditions")
+        "ARTS, MUSIC & CULTURE", "ARTS & CULTURE", "ARTS, MUSIC AND CULTURE" -> listOf("arts_culture")
+        "STORIES & HERITAGE", "STORIES AND HERITAGE" -> listOf("stories_heritage")
+        "NATURE & LIFESTYLE", "NATURE AND LIFESTYLE" -> listOf("nature_lifestyle")
+        else -> listOf("science", "maths", "languages", "career", "banking_finance", "legal", "health_wellness", "arts_culture", "recipes_traditions", "stories_heritage", "nature_lifestyle")
     }
 
     // First filter by parent category page
@@ -14014,6 +14187,51 @@ fun CategoryDetailScreen(
             // TAB 1 CONTENT: FIND AN EXPERT
             if (activeTab == "FIND AN EXPERT") {
 
+                    // Compact Horizontal Image Slider for Subcategories
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = "Explore Subcategories",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp)
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            LazyRow(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("compact_sub_exp_slider"),
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(category.subExperiences) { subExp ->
+                                    val isSelected = isSubExperienceSelected(subExp, selectedHighLevelCategory, selectedSpecialisationFilter)
+                                    CompactSubExperienceSliderCard(
+                                        subExp = subExp,
+                                        isSelected = isSelected,
+                                        onClick = {
+                                            if (isSelected) {
+                                                // Reset filter
+                                                selectedHighLevelCategory = "All"
+                                                selectedSpecialisationFilter = "All"
+                                            } else {
+                                                // Map and select filter
+                                                val (high, spec) = mapSubExperienceToFilters(subExp)
+                                                selectedHighLevelCategory = high
+                                                selectedSpecialisationFilter = spec
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     // --- REBUILT TWO-LEVEL FILTER SYSTEM FOR EXPERT SPECIALISATIONS ---
                     item {
                         Column(
@@ -14092,15 +14310,55 @@ fun CategoryDetailScreen(
 
                             // 2nd Level: Specialisation sub-filter chips
                             val specsForCategory = when (selectedHighLevelCategory) {
-                                "science" -> listOf("physics", "chemistry", "biology", "botany", "zoology", "nature_life_sciences", "environmental_science")
+                                "science" -> listOf("physics", "chemistry", "biology", "botany", "zoology", "nature_life_sciences", "environmental_science", "technology", "digital_skills")
                                 "maths" -> listOf("algebra", "vedic_maths", "board_prep", "calculus", "statistics", "jee_preparation")
-                                "languages" -> listOf("hindi", "tamil", "french", "malayalam", "sanskrit", "kannada", "telugu", "english_speaking")
-                                "career" -> listOf("career_counselling", "interview_coaching", "resume_building", "corporate_mentoring", "startup_guidance", "government_exam_coaching")
-                                "banking_finance" -> listOf("retail_banking", "branch_management", "investment_planning", "fixed_deposits", "loan_guidance", "retirement_planning")
-                                "ayurveda" -> listOf("kerala_ayurveda", "panchakarma", "ayurvedic_nutrition", "herbal_medicine", "ayurvedic_consultation", "naturopathy")
-                                "dance" -> listOf("bharatanatyam", "kuchipudi", "kathak", "odissi", "mohiniyattam", "manipuri", "folk_dance")
-                                "music" -> listOf("carnatic_vocal", "hindustani_vocal", "carnatic_instrumental", "hindustani_instrumental", "bhajans_devotional", "light_music", "film_songs")
-                                "physiotherapy" -> listOf("orthopaedic_physio", "neurological_physio", "sports_physio", "geriatric_physio", "cardiac_physio", "paediatric_physio", "post_surgery_rehab", "joint_specialist", "spine_specialist")
+                                "languages" -> listOf("sanskrit", "hindi", "kannada", "tamil", "telugu", "malayalam", "english", "french", "german")
+                                "career" -> listOf("career_guidance", "interview_preparation", "entrepreneurship")
+                                "banking_finance" -> listOf("retail_banking", "branch_management", "investment_planning", "fixed_deposits", "loan_guidance", "retirement_planning", "finance", "banking")
+                                "legal" -> listOf("legal_guidance")
+                                "health_wellness" -> listOf("ayurveda", "meditation", "yoga", "nutrition", "physiotherapy", "counselling", "mental_wellness", "healthy_ageing", "breathing_practices")
+                                "arts_culture" -> listOf(
+                                    "carnatic_vocal", "hindustani_vocal", "bhajans", "devotional_music", "veena", "violin", "flute", "mridangam",
+                                    "bharatanatyam", "kuchipudi", "kathak", "odissi", "mohiniyattam",
+                                    "tanjore_painting", "kalamkari", "rangoli", "traditional_crafts"
+                                )
+                                "recipes_traditions" -> listOf(
+                                    "south_indian_recipes", "north_indian_recipes", "festival_recipes", "traditional_cooking", "temple_prasadam_recipes", "vegetarian_cooking", "vegan_cooking", "regional_cuisines", "family_recipes", "traditional_sweets", "pickles_preserves"
+                                )
+                                "stories_heritage" -> listOf(
+                                    "ramayana", "mahabharata", "bhagavad_gita", "panchatantra", "moral_stories", "bedtime_stories", "grandparent_storytelling", "regional_folktales", "devotional_stories", "sanskrit_stories"
+                                )
+                                "nature_lifestyle" -> listOf(
+                                    "gardening", "terrace_gardening", "balcony_gardening", "indoor_gardening", "organic_farming", "vertical_gardening", "bonsai", "composting", "sustainable_living", "kitchen_gardening"
+                                )
+                                "All" -> {
+                                    parentCategoryToHighLevelMap.flatMap { catId ->
+                                        when (catId) {
+                                            "science" -> listOf("physics", "chemistry", "biology", "botany", "zoology", "nature_life_sciences", "environmental_science", "technology", "digital_skills")
+                                            "maths" -> listOf("algebra", "vedic_maths", "board_prep", "calculus", "statistics", "jee_preparation")
+                                            "languages" -> listOf("sanskrit", "hindi", "kannada", "tamil", "telugu", "malayalam", "english", "french", "german")
+                                            "career" -> listOf("career_guidance", "interview_preparation", "entrepreneurship")
+                                            "banking_finance" -> listOf("retail_banking", "branch_management", "investment_planning", "fixed_deposits", "loan_guidance", "retirement_planning", "finance", "banking")
+                                            "legal" -> listOf("legal_guidance")
+                                            "health_wellness" -> listOf("ayurveda", "meditation", "yoga", "nutrition", "physiotherapy", "counselling", "mental_wellness", "healthy_ageing", "breathing_practices")
+                                            "arts_culture" -> listOf(
+                                                "carnatic_vocal", "hindustani_vocal", "bhajans", "devotional_music", "veena", "violin", "flute", "mridangam",
+                                                "bharatanatyam", "kuchipudi", "kathak", "odissi", "mohiniyattam",
+                                                "tanjore_painting", "kalamkari", "rangoli", "traditional_crafts"
+                                            )
+                                            "recipes_traditions" -> listOf(
+                                                "south_indian_recipes", "north_indian_recipes", "festival_recipes", "traditional_cooking", "temple_prasadam_recipes", "vegetarian_cooking", "vegan_cooking", "regional_cuisines", "family_recipes", "traditional_sweets", "pickles_preserves"
+                                            )
+                                            "stories_heritage" -> listOf(
+                                                "ramayana", "mahabharata", "bhagavad_gita", "panchatantra", "moral_stories", "bedtime_stories", "grandparent_storytelling", "regional_folktales", "devotional_stories", "sanskrit_stories"
+                                            )
+                                            "nature_lifestyle" -> listOf(
+                                                "gardening", "terrace_gardening", "balcony_gardening", "indoor_gardening", "organic_farming", "vertical_gardening", "bonsai", "composting", "sustainable_living", "kitchen_gardening"
+                                            )
+                                            else -> emptyList()
+                                        }
+                                    }
+                                }
                                 else -> emptyList()
                             }
 

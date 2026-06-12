@@ -1590,7 +1590,14 @@ fun parseBookingDayAndTime(booking: Booking, calendarDays: List<CalendarDay>): P
         }
     }
     
-    val normalizedDay = when {
+    val matchedDay = calendarDays.find { cd ->
+        val keyUpper = cd.key.uppercase(java.util.Locale.US)
+        dayPart == keyUpper || timing.contains(keyUpper) ||
+        (cd.isToday && (dayPart.contains("TODAY") || timing.contains("TODAY"))) ||
+        (cd.dateString.isNotEmpty() && (dayPart.contains(cd.dateString) || timing.contains(cd.dateString)))
+    }
+    
+    val normalizedDay = matchedDay?.key ?: when {
         dayPart.contains("MON") -> "MON"
         dayPart.contains("TUE") -> "TUE"
         dayPart.contains("WED") -> "WED"
@@ -1600,11 +1607,13 @@ fun parseBookingDayAndTime(booking: Booking, calendarDays: List<CalendarDay>): P
         dayPart.contains("SUN") -> "SUN"
         dayPart.contains("YESTERDAY") -> {
             val yesterday = java.time.LocalDate.now().minusDays(1)
-            yesterday.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US).uppercase().take(3)
+            val yesterdayShort = yesterday.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US).uppercase().take(3)
+            "$yesterdayShort ${yesterday.dayOfMonth}"
         }
         dayPart.contains("TODAY") -> {
             val today = java.time.LocalDate.now()
-            today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US).uppercase().take(3)
+            val todayShort = today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US).uppercase().take(3)
+            "$todayShort ${today.dayOfMonth}"
         }
         else -> ""
     }
@@ -1691,6 +1700,91 @@ fun formatTimingWithDate(timing: String): String {
     return timing
 }
 
+data class CategoryDetails(
+    val emoji: String,
+    val bgColor: Color,
+    val accentColor: Color,
+    val categoryName: String
+)
+
+fun getBookingMonthYear(booking: Booking, calendarDays: List<CalendarDay>): String {
+    val parsed = parseBookingDayAndTime(booking, calendarDays) ?: return "June 2026"
+    val cd = calendarDays.find { it.key == parsed.first } ?: return "June 2026"
+    return try {
+        val ld = java.time.LocalDate.parse(cd.dateString)
+        val monthFull = ld.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.US)
+        "$monthFull ${ld.year}"
+    } catch (e: Exception) {
+        "June 2026"
+    }
+}
+
+fun formatMinutesToAmPm(minutes: Int): String {
+    val h = (minutes / 60) % 24
+    val m = minutes % 60
+    val suffix = if (h >= 12) "PM" else "AM"
+    val displayH = if (h % 12 == 0) 12 else h % 12
+    return String.format(java.util.Locale.US, "%d:%02d %s", displayH, m, suffix)
+}
+
+fun getCategoryDetails(booking: Booking, experts: List<Expert>): CategoryDetails {
+    val expert = experts.find { it.id == booking.expertId }
+    val title = (expert?.title ?: "").uppercase(java.util.Locale.US)
+    val category = (expert?.category ?: "").uppercase(java.util.Locale.US)
+    val topic = (expert?.topic ?: "").uppercase(java.util.Locale.US)
+    val name = booking.expertName.uppercase(java.util.Locale.US)
+    
+    return when {
+        // Mathematics
+        title.contains("MATH") || category.contains("MATH") || topic.contains("MATH") || name.contains("RAJESH") || title.contains("ALGEBRA") -> {
+            CategoryDetails("🧮", Color(0xFFFFF9DB), Color(0xFFF5E069), "Mathematics")
+        }
+        // Science & Technology
+        title.contains("SCIENCE") || category.contains("SCIENCE") || topic.contains("SCIENCE") || title.contains("TECH") || category.contains("TECH") || topic.contains("TECH") || title.contains("COMPUTER") || topic.contains("COMPUTER") -> {
+            CategoryDetails("💻", Color(0xFFE7F5FF), Color(0xFF74C0FC), "Science & Technology")
+        }
+        // Finance & Banking
+        title.contains("FINANCE") || category.contains("FINANCE") || topic.contains("FINANCE") || title.contains("BANK") || category.contains("BANK") || topic.contains("BANK") || title.contains("MONEY") -> {
+            CategoryDetails("💰", Color(0xFFEAF5E9), Color(0xFF81C784), "Finance & Banking")
+        }
+        // Nature & Gardening
+        title.contains("GARDEN") || category.contains("GARDEN") || topic.contains("GARDEN") || title.contains("NATURE") || category.contains("NATURE") -> {
+            CategoryDetails("🌱", Color(0xFFE6FCF5), Color(0xFF96F2D7), "Nature & Gardening")
+        }
+        // Music
+        title.contains("MUSIC") || category.contains("MUSIC") || topic.contains("MUSIC") || title.contains("SINGER") || title.contains("VIOLIN") || title.contains("GUITAR") -> {
+            CategoryDetails("🎻", Color(0xFFFFF0F6), Color(0xFFFAA2C1), "Music")
+        }
+        // Stories & Heritage
+        title.contains("STORY") || category.contains("STORY") || topic.contains("STORY") || title.contains("HERITAGE") || category.contains("HERITAGE") || title.contains("HISTORY") -> {
+            CategoryDetails("📖", Color(0xFFFFF3BF), Color(0xFFFFD43B), "Stories & Heritage")
+        }
+        // Meditation & Wellness
+        title.contains("MEDITATION") || category.contains("MEDITATION") || topic.contains("MEDITATION") || title.contains("WELLNESS") || category.contains("WELLNESS") || title.contains("YOGA") -> {
+            CategoryDetails("🧘", Color(0xFFE3FAF4), Color(0xFF66D9E8), "Meditation & Wellness")
+        }
+        // Languages
+        title.contains("LANGUAGE") || category.contains("LANGUAGE") || topic.contains("LANGUAGE") || title.contains("ENGLISH") || category.contains("ENGLISH") || title.contains("KANNADA") || title.contains("SPEAK") || title.contains("TALK") -> {
+            CategoryDetails("🗣️", Color(0xFFF3F0FF), Color(0xFFB197FC), "Languages")
+        }
+        // Cooking & Traditions
+        title.contains("COOK") || category.contains("COOK") || topic.contains("COOK") || title.contains("FOOD") || category.contains("FOOD") || title.contains("RECIPE") -> {
+            CategoryDetails("🍲", Color(0xFFFFE3E3), Color(0xFFFF8787), "Cooking & Traditions")
+        }
+        // Spiritual Learning
+        title.contains("SPIRITUAL") || category.contains("SPIRITUAL") || topic.contains("SPIRITUAL") || title.contains("SAFFRON") || title.contains("GITA") || title.contains("VEDA") -> {
+            CategoryDetails("🕉️", Color(0xFFFFF4E6), Color(0xFFFFC078), "Spiritual Learning")
+        }
+        // Fallbacks
+        category.contains("WELLNESS") || title.contains("HEALTH") -> {
+            CategoryDetails("🧘", Color(0xFFE3FAF4), Color(0xFF66D9E8), "Meditation & Wellness")
+        }
+        else -> {
+            CategoryDetails("📖", Color(0xFFF3F0FF), Color(0xFFB197FC), "Learning Session")
+        }
+    }
+}
+
 @Composable
 fun BookingCalendar(
     selectedDayKey: String,
@@ -1719,12 +1813,24 @@ fun BookingCalendar(
         items(daysList) { day ->
             val isSelected = selectedDayKey.uppercase() == day.key.uppercase()
             
+            val isPast = try {
+                val date = java.time.LocalDate.parse(day.dateString)
+                date.isBefore(java.time.LocalDate.now())
+            } catch (e: Exception) {
+                false
+            }
+            
             val dayBookings = bookingsList.filter { b ->
                 val bTiming = b.timing.uppercase()
                 val dayKey = day.key.uppercase()
                 val dayNameFull = day.fullName.uppercase()
-                bTiming.contains(dayKey) || bTiming.contains(dayNameFull) ||
-                (day.isToday && bTiming.contains("TODAY"))
+                val matched = parseBookingDayAndTime(b, daysList)
+                if (matched != null) {
+                    matched.first.uppercase() == dayKey
+                } else {
+                    bTiming.contains(dayKey) || bTiming.contains(dayNameFull) ||
+                    (day.isToday && bTiming.contains("TODAY"))
+                }
             }
             
             // Availability determination: if >= 10 bookings on this day, no availability (Grey dot). Otherwise green dot.
@@ -1737,11 +1843,12 @@ fun BookingCalendar(
                     .clip(RoundedCornerShape(16.dp))
                     .clickable { onDaySelected(day) }
                     .padding(vertical = 6.dp)
+                    .then(if (isPast) Modifier.alpha(0.75f) else Modifier)
                     .testTag("booking_calendar_day_${day.key.uppercase()}")
             ) {
                 // Day Tag short, e.g. "MON"
                 Text(
-                    text = day.key.uppercase(),
+                    text = day.key.substringBefore(" ").uppercase(),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = if (isSelected) Color(0xFF6200EE) else Color(0xFF8E8E93),
@@ -1785,15 +1892,41 @@ fun BookingCalendar(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Availability dot (Green if available, Grey if full)
-                Box(
-                    modifier = Modifier
-                        .size(6.dp)
-                        .background(
-                            color = if (isAvailable) Color(0xFF2ECC71) else Color(0xFFC7C7CC),
-                            shape = CircleShape
-                        )
-                )
+                // Indicators below date number
+                if (isPast) {
+                    if (dayBookings.isNotEmpty()) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(top = 2.dp)
+                        ) {
+                            dayBookings.forEach { b ->
+                                val dotColor = when (b.status.uppercase(java.util.Locale.US)) {
+                                    "CANCELLED", "CANCELED" -> Color(0xFFC62828) // Red dot
+                                    "RESCHEDULED" -> Color(0xFF7B1FA2)           // Purple dot
+                                    else -> Color(0xFF8E8E93)                    // Grey dot for completed/past/upcoming in past
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .background(dotColor, CircleShape)
+                                )
+                            }
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+                } else {
+                    // Current/Future day: availability dot
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(
+                                color = if (isAvailable) Color(0xFF2ECC71) else Color(0xFFC7C7CC),
+                                shape = CircleShape
+                            )
+                    )
+                }
             }
         }
     }
@@ -16865,10 +16998,12 @@ fun SessionDetailsDialog(
                     }
 
                     // Booking info card
+                    val experts by viewModel.experts.collectAsState()
+                    val categoryDetails = getCategoryDetails(booking, experts)
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF9F9FB)),
-                        border = BorderStroke(1.dp, Color(0xFFECECEF)),
+                        colors = CardDefaults.cardColors(containerColor = categoryDetails.bgColor),
+                        border = BorderStroke(1.dp, categoryDetails.accentColor.copy(alpha = 0.5f)),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Column(
@@ -17007,16 +17142,15 @@ fun PremiumBookingCalendarScreen(
     }
 
     val today = java.time.LocalDate.now()
-    val currentMonday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
     val calendarDays = remember {
-        (0..6).map { i ->
-            val date = currentMonday.plusDays(i.toLong())
+        (-7..30).map { i ->
+            val date = today.plusDays(i.toLong())
             val isDateToday = date.isEqual(today)
-            val shortName = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US)
+            val shortName = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US).uppercase().take(3)
             val fullName = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.US)
             val labelNum = date.dayOfMonth.toString()
             CalendarDay(
-                key = shortName.take(3).uppercase(),
+                key = "$shortName $labelNum",
                 fullName = fullName,
                 labelNum = labelNum,
                 isToday = isDateToday,
@@ -17026,7 +17160,8 @@ fun PremiumBookingCalendarScreen(
     }
 
     val initiallySelectedDay = remember {
-        today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US).uppercase().take(3)
+        val todayShortName = today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US).uppercase().take(3)
+        "$todayShortName ${today.dayOfMonth}"
     }
     var selectedDay by remember(initiallySelectedDay) { mutableStateOf(initiallySelectedDay) }
     var selectedDuration by remember { mutableStateOf(30) } // 30, 45, 60 minutes option
@@ -17091,14 +17226,14 @@ fun PremiumBookingCalendarScreen(
     ) {
         val selectedDateText = remember(selectedDay, calendarDays) {
             val activeDayObj = calendarDays.find { it.key == selectedDay } ?: calendarDays[0]
-            val shortDayName = activeDayObj.key.lowercase().capitalize(java.util.Locale.US)
-            val dateLabel = try {
+            val fullDayName = activeDayObj.fullName.lowercase().capitalize(java.util.Locale.US)
+            val monthName = try {
                 val d = java.time.LocalDate.parse(activeDayObj.dateString)
-                d.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US)
+                d.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.US)
             } catch (e: Exception) {
-                "Jun"
+                "June"
             }
-            "$shortDayName, ${activeDayObj.labelNum} $dateLabel"
+            "$fullDayName, ${activeDayObj.labelNum} $monthName"
         }
 
         Scaffold(
@@ -17270,7 +17405,7 @@ fun PremiumBookingCalendarScreen(
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                // Month Selector Group with arrows < June 2026 ▾ >
+                // Month Selector Group (Removed inactive month navigation controls since calendar is a rolling strip)
                 val currentMonthYearText = remember(selectedDay, calendarDays) {
                     val activeDayObj = calendarDays.find { it.key == selectedDay } ?: calendarDays.firstOrNull()
                     val dateStr = activeDayObj?.dateString ?: ""
@@ -17291,59 +17426,16 @@ fun PremiumBookingCalendarScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(
-                        onClick = {
-                            // Quick navigate selection back by shifting days index
-                            val currentIndex = calendarDays.indexOfFirst { it.key == selectedDay }
-                            if (currentIndex > 0) {
-                                selectedDay = calendarDays[currentIndex - 1].key.uppercase()
-                                selectedSlot = null
-                            }
-                        },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Prev", tint = Color.DarkGray)
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { /* Toggle month picker */ }
-                    ) {
-                        Text(
-                            text = currentMonthYearText,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            imageVector = Icons.Default.ArrowDropDown,
-                            contentDescription = "Dropdown",
-                            tint = Color.DarkGray,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    IconButton(
-                        onClick = {
-                            val currentIndex = calendarDays.indexOfFirst { it.key == selectedDay }
-                            if (currentIndex != -1 && currentIndex < calendarDays.size - 1) {
-                                selectedDay = calendarDays[currentIndex + 1].key.uppercase()
-                                selectedSlot = null
-                            }
-                        },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(Icons.Default.KeyboardArrowRight, contentDescription = "Next", tint = Color.DarkGray)
-                    }
+                    Text(
+                        text = currentMonthYearText,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
                 }
 
                 // Month week strip
@@ -17364,11 +17456,27 @@ fun PremiumBookingCalendarScreen(
                 }
 
                 if (isPersonalCalendar) {
+                    val isSelectedDayPast = try {
+                        val activeDayObj = calendarDays.find { it.key == selectedDay }
+                        activeDayObj?.dateString?.let { java.time.LocalDate.parse(it).isBefore(java.time.LocalDate.now()) } ?: false
+                    } catch (e: Exception) {
+                        false
+                    }
+
                     val selectedDayBookings = bookingsList.filter { b ->
-                        if (b.status == "cancelled") return@filter false
                         val bTiming = b.timing.uppercase()
-                        bTiming.contains(selectedDay) || 
-                          (selectedDay == today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US).uppercase().take(3) && bTiming.contains("TODAY"))
+                        val dayKey = selectedDay.uppercase()
+                        
+                        // Only filter out "cancelled" future sessions. Keep cancelled past sessions!
+                        if (b.status == "cancelled" && !isSelectedDayPast) return@filter false
+                        
+                        val matched = parseBookingDayAndTime(b, calendarDays)
+                        if (matched != null) {
+                            matched.first.uppercase() == dayKey
+                        } else {
+                            bTiming.contains(dayKey) || 
+                            (selectedDay == today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US).uppercase().take(3) && bTiming.contains("TODAY"))
+                        }
                     }
 
                     var showAllHistory by remember { mutableStateOf(false) }
@@ -17400,12 +17508,62 @@ fun PremiumBookingCalendarScreen(
                     }
 
                     val activeList = if (showAllHistory) {
-                        bookingsList.filter { it.status != "cancelled" }
+                        bookingsList.filter { b ->
+                            val parsed = parseBookingDayAndTime(b, calendarDays)
+                            val isPastSession = if (parsed != null) {
+                                val activeDayObj = calendarDays.find { it.key == parsed.first }
+                                val isSelectedDayToday = activeDayObj?.isToday == true
+                                val isSelectedDayPast = try {
+                                    activeDayObj?.dateString?.let { java.time.LocalDate.parse(it).isBefore(java.time.LocalDate.now()) } ?: false
+                                } catch (e: Exception) {
+                                    false
+                                }
+                                isSelectedDayPast || (isSelectedDayToday && parsed.second <= (java.time.LocalTime.now().hour * 60 + java.time.LocalTime.now().minute))
+                            } else {
+                                false
+                            }
+                            isPastSession || b.status.uppercase() in listOf("COMPLETED", "PAST", "CANCELLED", "CANCELED", "RESCHEDULED")
+                        }
                     } else {
                         selectedDayBookings
                     }
                     val sortedActiveList = remember(activeList, calendarDays) {
                         sortBookingsChronologically(activeList, calendarDays)
+                    }
+
+                    val experts by viewModel.experts.collectAsState()
+
+                    // Precalculate hourly timeline markers and scheduler items with exact slot ranges
+                    val scheduleItems = remember(sortedActiveList, calendarDays) {
+                        val list = mutableListOf<Pair<Booking?, Int>>()
+                        var t = 480 // 08:00 AM
+                        val endT = 1320 // 10:00 PM
+                        while (t <= endT) {
+                            val booking = sortedActiveList.find { b ->
+                                val parsed = parseBookingDayAndTime(b, calendarDays)
+                                parsed != null && parsed.second >= t && parsed.second < t + 60
+                            }
+                            if (booking != null) {
+                                val parsed = parseBookingDayAndTime(booking, calendarDays)
+                                val actualStart = parsed?.second ?: t
+                                list.add(Pair(booking, actualStart))
+                                t = actualStart + booking.durationMinutes
+                            } else {
+                                val isInsideAny = sortedActiveList.any { b ->
+                                    val parsed = parseBookingDayAndTime(b, calendarDays)
+                                    if (parsed != null) {
+                                        t > parsed.second && t < parsed.second + b.durationMinutes
+                                    } else {
+                                        false
+                                    }
+                                }
+                                if (!isInsideAny) {
+                                    list.add(Pair(null, t))
+                                }
+                                t += 60
+                            }
+                        }
+                        list
                     }
 
                     LazyColumn(
@@ -17415,127 +17573,653 @@ fun PremiumBookingCalendarScreen(
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 40.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        if (sortedActiveList.isEmpty()) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 40.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text("📅", fontSize = 48.sp)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text(
-                                            text = if (showAllHistory) "No session bookings found." else "No sessions scheduled for $selectedDateText",
-                                            fontSize = 14.sp,
-                                            color = Color.Gray,
-                                            fontWeight = FontWeight.Medium,
-                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                        )
-                                        Spacer(modifier = Modifier.height(16.dp))
-                                        Button(
-                                            onClick = { onBack() },
-                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6200EE)),
-                                            shape = RoundedCornerShape(10.dp),
-                                            modifier = Modifier.testTag("book_new_session_empty_state")
+                        val isSelectedDayPast = try {
+                            val activeDayObj = calendarDays.find { it.key == selectedDay }
+                            activeDayObj?.dateString?.let { java.time.LocalDate.parse(it).isBefore(java.time.LocalDate.now()) } ?: false
+                        } catch (e: Exception) {
+                            false
+                        }
+
+                        if (showAllHistory || isSelectedDayPast) {
+                            if (sortedActiveList.isEmpty()) {
+                                item {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 40.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text("📅", fontSize = 48.sp)
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                text = "No past sessions yet.",
+                                                fontSize = 14.sp,
+                                                color = Color.Gray,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
+                                if (showAllHistory) {
+                                    // Group by month-year
+                                    val groupedBookings = sortedActiveList.groupBy { getBookingMonthYear(it, calendarDays) }
+                                    groupedBookings.forEach { (monthYear, groupList) ->
+                                        item {
+                                            Text(
+                                                text = monthYear,
+                                                fontSize = 16.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.Black,
+                                                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                                            )
+                                        }
+                                        
+                                        items(groupList.size) { index ->
+                                            val booking = groupList[index]
+                                            val categoryDetails = getCategoryDetails(booking, experts)
+                                            Card(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable { selectedBookingForDetails = booking }
+                                                    .testTag("booking_schedule_card_${booking.id}"),
+                                                colors = CardDefaults.cardColors(containerColor = categoryDetails.bgColor),
+                                                border = BorderStroke(1.dp, categoryDetails.accentColor.copy(alpha = 0.5f)),
+                                                shape = RoundedCornerShape(16.dp)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.height(IntrinsicSize.Min)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .width(4.dp)
+                                                            .fillMaxHeight()
+                                                            .background(categoryDetails.accentColor)
+                                                    )
+                                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                                        Row(
+                                                            modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = if (booking.status.uppercase() == "UPCOMING") 8.dp else 14.dp),
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .size(46.dp)
+                                                                    .clip(CircleShape)
+                                                            ) {
+                                                                ProceduralLinkedInAvatar(
+                                                                    name = booking.expertName,
+                                                                    sizeDp = 46,
+                                                                    avatarUrl = booking.expertAvatar
+                                                                )
+                                                            }
+
+                                                            Spacer(modifier = Modifier.width(12.dp))
+
+                                                            Column(modifier = Modifier.weight(1f)) {
+                                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                    Text(
+                                                                        text = categoryDetails.emoji,
+                                                                        fontSize = 16.sp
+                                                                    )
+                                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                                    Text(
+                                                                        text = booking.expertName,
+                                                                        fontSize = 14.sp,
+                                                                        fontWeight = FontWeight.Bold,
+                                                                        color = Color.Black
+                                                                    )
+                                                                }
+                                                                val expert = experts.find { it.id == booking.expertId }
+                                                                val expertTitleForDisplay = expert?.title ?: "Wisdom Bridge Session"
+                                                                Text(
+                                                                    text = expertTitleForDisplay,
+                                                                    fontSize = 12.sp,
+                                                                    color = Color.DarkGray,
+                                                                    fontWeight = FontWeight.Medium
+                                                                )
+                                                                Spacer(modifier = Modifier.height(4.dp))
+                                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                    Icon(
+                                                                        imageVector = Icons.Default.AccessTime,
+                                                                        contentDescription = "Time",
+                                                                        tint = Color(0xFF6200EE),
+                                                                        modifier = Modifier.size(14.dp)
+                                                                    )
+                                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                                    Text(
+                                                                        text = booking.timing,
+                                                                        fontSize = 12.sp,
+                                                                        fontWeight = FontWeight.Bold,
+                                                                        color = Color(0xFF6200EE)
+                                                                    )
+                                                                }
+                                                            }
+
+                                                            Spacer(modifier = Modifier.width(8.dp))
+
+                                                            val statusDisplayName = when (booking.status.uppercase()) {
+                                                                "UPCOMING" -> "Upcoming"
+                                                                "COMPLETED", "PAST" -> "Completed"
+                                                                "CANCELLED", "CANCELED" -> "Cancelled"
+                                                                "RESCHEDULED" -> "Rescheduled"
+                                                                else -> booking.status
+                                                            }
+
+                                                            val statusColorMap = when (booking.status.uppercase()) {
+                                                                "UPCOMING" -> Pair(Color(0xFFE8F5E9), Color(0xFF2E7D32))
+                                                                "COMPLETED", "PAST" -> Pair(Color(0xFFE3F2FD), Color(0xFF1565C0))
+                                                                "CANCELLED", "CANCELED" -> Pair(Color(0xFFFFEBEE), Color(0xFFC62828))
+                                                                "RESCHEDULED" -> Pair(Color(0xFFF3E5F5), Color(0xFF7B1FA2))
+                                                                else -> Pair(Color(0xFFE8F5E9), Color(0xFF2E7D32))
+                                                            }
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .clip(RoundedCornerShape(8.dp))
+                                                                    .background(statusColorMap.first)
+                                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                            ) {
+                                                                Text(
+                                                                    text = statusDisplayName,
+                                                                    fontSize = 10.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    color = statusColorMap.second
+                                                                )
+                                                            }
+                                                        }
+
+                                                        if (booking.status.uppercase() == "UPCOMING") {
+                                                            Row(
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .padding(start = 72.dp, end = 14.dp, bottom = 12.dp),
+                                                                horizontalArrangement = Arrangement.Start,
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
+                                                                Row(
+                                                                    modifier = Modifier
+                                                                        .clickable { activeRescheduleBookingId = booking.id }
+                                                                        .padding(vertical = 4.dp, horizontal = 6.dp),
+                                                                    verticalAlignment = Alignment.CenterVertically
+                                                                ) {
+                                                                    Text("✏️ Reschedule", fontSize = 11.sp, color = Color(0xFF6200EE), fontWeight = FontWeight.Bold)
+                                                                }
+                                                                Spacer(modifier = Modifier.width(16.dp))
+                                                                Row(
+                                                                    modifier = Modifier
+                                                                        .clickable { viewModel.startDirectChat(booking.expertId, navigateToTab = true) }
+                                                                        .padding(vertical = 4.dp, horizontal = 6.dp),
+                                                                    verticalAlignment = Alignment.CenterVertically
+                                                                ) {
+                                                                    Text("💬 Message", fontSize = 11.sp, color = Color(0xFF6200EE), fontWeight = FontWeight.Bold)
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    // Just render selected day's bookings chronologically as cards directly (with no groups)
+                                    items(sortedActiveList.size) { index ->
+                                        val booking = sortedActiveList[index]
+                                        val categoryDetails = getCategoryDetails(booking, experts)
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable { selectedBookingForDetails = booking }
+                                                .testTag("booking_schedule_card_${booking.id}"),
+                                            colors = CardDefaults.cardColors(containerColor = categoryDetails.bgColor),
+                                            border = BorderStroke(1.dp, categoryDetails.accentColor.copy(alpha = 0.5f)),
+                                            shape = RoundedCornerShape(16.dp)
                                         ) {
-                                            Text("Book a New Session", fontWeight = FontWeight.Bold)
+                                            Row(
+                                                modifier = Modifier.height(IntrinsicSize.Min)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .width(4.dp)
+                                                        .fillMaxHeight()
+                                                        .background(categoryDetails.accentColor)
+                                                )
+                                                Column(modifier = Modifier.fillMaxWidth()) {
+                                                    Row(
+                                                        modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = if (booking.status.uppercase() == "UPCOMING") 8.dp else 14.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(46.dp)
+                                                                .clip(CircleShape)
+                                                        ) {
+                                                            ProceduralLinkedInAvatar(
+                                                                name = booking.expertName,
+                                                                sizeDp = 46,
+                                                                avatarUrl = booking.expertAvatar
+                                                            )
+                                                        }
+
+                                                        Spacer(modifier = Modifier.width(12.dp))
+
+                                                        Column(modifier = Modifier.weight(1f)) {
+                                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                Text(
+                                                                    text = categoryDetails.emoji,
+                                                                    fontSize = 16.sp
+                                                                )
+                                                                Spacer(modifier = Modifier.width(4.dp))
+                                                                Text(
+                                                                    text = booking.expertName,
+                                                                    fontSize = 14.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    color = Color.Black
+                                                                )
+                                                            }
+                                                            val expert = experts.find { it.id == booking.expertId }
+                                                            val expertTitleForDisplay = expert?.title ?: "Wisdom Bridge Session"
+                                                            Text(
+                                                                text = expertTitleForDisplay,
+                                                                fontSize = 12.sp,
+                                                                color = Color.DarkGray,
+                                                                fontWeight = FontWeight.Medium
+                                                            )
+                                                            Spacer(modifier = Modifier.height(4.dp))
+                                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                Icon(
+                                                                    imageVector = Icons.Default.AccessTime,
+                                                                    contentDescription = "Time",
+                                                                    tint = Color(0xFF6200EE),
+                                                                    modifier = Modifier.size(14.dp)
+                                                                )
+                                                                Spacer(modifier = Modifier.width(4.dp))
+                                                                Text(
+                                                                    text = booking.timing,
+                                                                    fontSize = 12.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    color = Color(0xFF6200EE)
+                                                                )
+                                                            }
+                                                        }
+
+                                                        Spacer(modifier = Modifier.width(8.dp))
+
+                                                        val statusDisplayName = when (booking.status.uppercase()) {
+                                                            "UPCOMING" -> "Upcoming"
+                                                            "COMPLETED", "PAST" -> "Completed"
+                                                            "CANCELLED", "CANCELED" -> "Cancelled"
+                                                            "RESCHEDULED" -> "Rescheduled"
+                                                            else -> booking.status
+                                                        }
+
+                                                        val statusColorMap = when (booking.status.uppercase()) {
+                                                            "UPCOMING" -> Pair(Color(0xFFE8F5E9), Color(0xFF2E7D32))
+                                                            "COMPLETED", "PAST" -> Pair(Color(0xFFE3F2FD), Color(0xFF1565C0))
+                                                            "CANCELLED", "CANCELED" -> Pair(Color(0xFFFFEBEE), Color(0xFFC62828))
+                                                            "RESCHEDULED" -> Pair(Color(0xFFF3E5F5), Color(0xFF7B1FA2))
+                                                            else -> Pair(Color(0xFFE8F5E9), Color(0xFF2E7D32))
+                                                        }
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .clip(RoundedCornerShape(8.dp))
+                                                                .background(statusColorMap.first)
+                                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                                        ) {
+                                                            Text(
+                                                                text = statusDisplayName,
+                                                                fontSize = 10.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = statusColorMap.second
+                                                            )
+                                                        }
+                                                    }
+
+                                                    if (booking.status.uppercase() == "UPCOMING") {
+                                                        Row(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .padding(start = 72.dp, end = 14.dp, bottom = 12.dp),
+                                                            horizontalArrangement = Arrangement.Start,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Row(
+                                                                modifier = Modifier
+                                                                    .clickable { activeRescheduleBookingId = booking.id }
+                                                                    .padding(vertical = 4.dp, horizontal = 6.dp),
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
+                                                                Text("✏️ Reschedule", fontSize = 11.sp, color = Color(0xFF6200EE), fontWeight = FontWeight.Bold)
+                                                            }
+                                                            Spacer(modifier = Modifier.width(16.dp))
+                                                            Row(
+                                                                modifier = Modifier
+                                                                    .clickable { viewModel.startDirectChat(booking.expertId, navigateToTab = true) }
+                                                                    .padding(vertical = 4.dp, horizontal = 6.dp),
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
+                                                                Text("💬 Message", fontSize = 11.sp, color = Color(0xFF6200EE), fontWeight = FontWeight.Bold)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }
                         } else {
-                            items(sortedActiveList.size) { index ->
-                                val booking = sortedActiveList[index]
-                                Card(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { selectedBookingForDetails = booking }
-                                        .testTag("booking_schedule_card_${booking.id}"),
-                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFBFBFF)),
-                                    border = BorderStroke(1.dp, Color(0xFFE2DDF8)),
-                                    shape = RoundedCornerShape(16.dp)
-                                ) {
+                            val isSelectedDayToday = calendarDays.find { it.key == selectedDay }?.isToday == true
+                            val currentMinutes = try {
+                                java.time.LocalTime.now().hour * 60 + java.time.LocalTime.now().minute
+                            } catch (e: Exception) {
+                                0
+                            }
+                            
+                            val upcomingActiveSessions = sortedActiveList.filter { b ->
+                                val parsed = parseBookingDayAndTime(b, calendarDays) ?: return@filter false
+                                if (isSelectedDayToday) parsed.second > currentMinutes else true
+                            }
+                            val nextBookingId = upcomingActiveSessions.firstOrNull()?.id
+                            
+                            items(scheduleItems.size) { index ->
+                                val item = scheduleItems[index]
+                                val booking = item.first
+                                val itemStartMinutes = item.second
+
+                                if (booking != null) {
+                                    val milestoneTime = formatMinutesToAmPm(itemStartMinutes)
+                                    val categoryDetails = getCategoryDetails(booking, experts)
+                                    val isCurrentSlotNow = isSelectedDayToday && (currentMinutes >= itemStartMinutes && currentMinutes < itemStartMinutes + booking.durationMinutes)
+                                    val isCurrentSlotNext = booking.id == nextBookingId
+                                    val cardHeight = (booking.durationMinutes * 2).dp
+
                                     Row(
-                                        modifier = Modifier.padding(16.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        verticalAlignment = Alignment.Top
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.width(64.dp),
+                                            horizontalAlignment = Alignment.End
+                                        ) {
+                                            Text(
+                                                text = milestoneTime,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.DarkGray,
+                                                modifier = Modifier.padding(top = 4.dp)
+                                            )
+                                            if (isCurrentSlotNow) {
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .background(Color(0xFFFF3B30))
+                                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text("NOW", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                }
+                                            } else if (isCurrentSlotNext) {
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .background(Color(0xFF6200EE))
+                                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text("NEXT", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.width(16.dp))
+
+                                        Box(
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Card(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(cardHeight)
+                                                    .clickable { selectedBookingForDetails = booking }
+                                                    .testTag("booking_schedule_card_${booking.id}"),
+                                                colors = CardDefaults.cardColors(containerColor = categoryDetails.bgColor),
+                                                border = BorderStroke(1.dp, categoryDetails.accentColor.copy(alpha = 0.5f)),
+                                                shape = RoundedCornerShape(16.dp)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxHeight()
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .width(4.dp)
+                                                            .fillMaxHeight()
+                                                            .background(categoryDetails.accentColor)
+                                                    )
+                                                    Column(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .fillMaxHeight()
+                                                            .padding(
+                                                                horizontal = 12.dp,
+                                                                vertical = if (booking.durationMinutes <= 45) 6.dp else 12.dp
+                                                            ),
+                                                        verticalArrangement = if (booking.durationMinutes <= 45) Arrangement.Center else Arrangement.SpaceBetween
+                                                    ) {
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .size(if (booking.durationMinutes <= 45) 28.dp else 40.dp)
+                                                                    .clip(CircleShape)
+                                                            ) {
+                                                                ProceduralLinkedInAvatar(
+                                                                    name = booking.expertName,
+                                                                    sizeDp = if (booking.durationMinutes <= 45) 28 else 40,
+                                                                    avatarUrl = booking.expertAvatar
+                                                                )
+                                                            }
+
+                                                            Spacer(modifier = Modifier.width(if (booking.durationMinutes <= 45) 8.dp else 10.dp))
+
+                                                            Column(modifier = Modifier.weight(1f)) {
+                                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                    Text(
+                                                                        text = categoryDetails.emoji,
+                                                                        fontSize = if (booking.durationMinutes <= 45) 12.sp else 14.sp
+                                                                    )
+                                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                                    Text(
+                                                                        text = booking.expertName,
+                                                                        fontSize = if (booking.durationMinutes <= 45) 12.sp else 13.sp,
+                                                                        fontWeight = FontWeight.Bold,
+                                                                        color = Color.Black,
+                                                                        maxLines = 1,
+                                                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                                                    )
+                                                                }
+                                                                val expert = experts.find { it.id == booking.expertId }
+                                                                val expertTitleForDisplay = expert?.title ?: "Wisdom Bridge Session"
+                                                                Text(
+                                                                    text = expertTitleForDisplay,
+                                                                    fontSize = if (booking.durationMinutes <= 45) 10.sp else 11.sp,
+                                                                    color = Color.DarkGray,
+                                                                    fontWeight = FontWeight.Medium,
+                                                                    maxLines = 1,
+                                                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                                                )
+                                                            }
+
+                                                            Spacer(modifier = Modifier.width(6.dp))
+
+                                                            val statusDisplayName = when (booking.status.uppercase()) {
+                                                                "UPCOMING" -> "Upcoming"
+                                                                "COMPLETED", "PAST" -> "Completed"
+                                                                "CANCELLED", "CANCELED" -> "Cancelled"
+                                                                "RESCHEDULED" -> "Rescheduled"
+                                                                else -> booking.status
+                                                            }
+
+                                                            val statusColorMap = when (booking.status.uppercase()) {
+                                                                "UPCOMING" -> Pair(Color(0xFFE8F5E9), Color(0xFF2E7D32))
+                                                                "COMPLETED", "PAST" -> Pair(Color(0xFFE3F2FD), Color(0xFF1565C0))
+                                                                "CANCELLED", "CANCELED" -> Pair(Color(0xFFFFEBEE), Color(0xFFC62828))
+                                                                "RESCHEDULED" -> Pair(Color(0xFFF3E5F5), Color(0xFF7B1FA2))
+                                                                else -> Pair(Color(0xFFE8F5E9), Color(0xFF2E7D32))
+                                                            }
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .clip(RoundedCornerShape(6.dp))
+                                                                    .background(statusColorMap.first)
+                                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                            ) {
+                                                                Text(
+                                                                    text = statusDisplayName,
+                                                                    fontSize = if (booking.durationMinutes <= 45) 8.sp else 9.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    color = statusColorMap.second
+                                                                )
+                                                            }
+                                                        }
+
+                                                        if (booking.durationMinutes > 45) {
+                                                            Column {
+                                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                    Icon(
+                                                                        imageVector = Icons.Default.AccessTime,
+                                                                        contentDescription = "Time",
+                                                                        tint = Color(0xFF6200EE),
+                                                                        modifier = Modifier.size(12.dp)
+                                                                    )
+                                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                                    Text(
+                                                                        text = booking.timing + " (${booking.durationMinutes}m)",
+                                                                        fontSize = 11.sp,
+                                                                        fontWeight = FontWeight.Bold,
+                                                                        color = Color(0xFF6200EE)
+                                                                    )
+                                                                }
+
+                                                                if (booking.status.uppercase() == "UPCOMING") {
+                                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                                    Row(
+                                                                        modifier = Modifier.fillMaxWidth(),
+                                                                        horizontalArrangement = Arrangement.Start,
+                                                                        verticalAlignment = Alignment.CenterVertically
+                                                                    ) {
+                                                                        Row(
+                                                                            modifier = Modifier
+                                                                                .clickable { activeRescheduleBookingId = booking.id }
+                                                                                .padding(vertical = 2.dp, horizontal = 4.dp),
+                                                                            verticalAlignment = Alignment.CenterVertically
+                                                                        ) {
+                                                                            Text("✏️ Reschedule", fontSize = 10.sp, color = Color(0xFF6200EE), fontWeight = FontWeight.Bold)
+                                                                        }
+                                                                        Spacer(modifier = Modifier.width(12.dp))
+                                                                        Row(
+                                                                            modifier = Modifier
+                                                                                .clickable { viewModel.startDirectChat(booking.expertId, navigateToTab = true) }
+                                                                                .padding(vertical = 2.dp, horizontal = 4.dp),
+                                                                            verticalAlignment = Alignment.CenterVertically
+                                                                        ) {
+                                                                            Text("💬 Message", fontSize = 10.sp, color = Color(0xFF6200EE), fontWeight = FontWeight.Bold)
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        } else {
+                                                            Spacer(modifier = Modifier.height(2.dp))
+                                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                Icon(
+                                                                    imageVector = Icons.Default.AccessTime,
+                                                                    contentDescription = "Time",
+                                                                    tint = Color(0xFF6200EE),
+                                                                    modifier = Modifier.size(10.dp)
+                                                                )
+                                                                Spacer(modifier = Modifier.width(4.dp))
+                                                                Text(
+                                                                    text = booking.timing + " (${booking.durationMinutes}m)",
+                                                                    fontSize = 9.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    color = Color(0xFF6200EE)
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    val milestoneTime = formatMinutesToAmPm(itemStartMinutes)
+                                    val isCurrentSlotNow = isSelectedDayToday && (currentMinutes >= itemStartMinutes && currentMinutes < itemStartMinutes + 60)
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 2.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(52.dp)
-                                                .clip(CircleShape)
-                                        ) {
-                                            ProceduralLinkedInAvatar(
-                                                name = booking.expertName,
-                                                sizeDp = 52,
-                                                avatarUrl = booking.expertAvatar
-                                            )
-                                        }
-
-                                        Spacer(modifier = Modifier.width(12.dp))
-
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(
-                                                    text = "🧘",
-                                                    fontSize = 16.sp
-                                                )
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text(
-                                                    text = booking.expertName,
-                                                    fontSize = 14.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.Black
-                                                )
-                                            }
-                                            Text(
-                                                text = "Wisdom Bridge Session",
-                                                fontSize = 12.sp,
-                                                color = Color.Gray
-                                            )
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(
-                                                    imageVector = Icons.Default.AccessTime,
-                                                    contentDescription = "Time",
-                                                    tint = Color(0xFF6200EE),
-                                                    modifier = Modifier.size(14.dp)
-                                                )
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text(
-                                                    text = booking.timing,
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFF6200EE)
-                                                )
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.width(8.dp))
-
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(
-                                                    when (booking.status.uppercase()) {
-                                                        "UPCOMING" -> Color(0xFFE8F5E9)
-                                                        "PAST", "COMPLETED" -> Color(0xFFF1F1F4)
-                                                        else -> Color(0xFFE8F5E9)
-                                                    }
-                                                )
-                                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        Column(
+                                            modifier = Modifier.width(64.dp),
+                                            horizontalAlignment = Alignment.End
                                         ) {
                                             Text(
-                                                text = booking.status,
-                                                fontSize = 10.sp,
+                                                text = milestoneTime,
+                                                fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                color = when (booking.status.uppercase()) {
-                                                    "UPCOMING" -> Color(0xFF2E7D32)
-                                                    "PAST", "COMPLETED" -> Color.Gray
-                                                    else -> Color(0xFF2E7D32)
-                                                }
+                                                color = Color.LightGray,
+                                                modifier = Modifier.padding(top = 4.dp)
                                             )
+                                            if (isCurrentSlotNow) {
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .background(Color(0xFFFF3B30).copy(alpha = 0.5f))
+                                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                                ) {
+                                                    Text("NOW", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.width(16.dp))
+
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(40.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .height(1.dp)
+                                                        .background(Color(0xFFF1F5F9))
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = "Available Slot",
+                                                    fontSize = 10.sp,
+                                                    color = Color.LightGray,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .height(1.dp)
+                                                        .background(Color(0xFFF1F5F9))
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -17671,7 +18355,17 @@ fun PremiumBookingCalendarScreen(
                                             overlap
                                         }
 
+                                        val activeDayObj = calendarDays.find { it.key == selectedDay }
+                                        val isSelectedDayToday = activeDayObj?.isToday == true
+                                        val isSelectedDayPast = try {
+                                            activeDayObj?.dateString?.let { java.time.LocalDate.parse(it).isBefore(java.time.LocalDate.now()) } ?: false
+                                        } catch (e: Exception) {
+                                            false
+                                        }
+                                        val isPastSlot = isSelectedDayPast || (isSelectedDayToday && slotStartMin <= (java.time.LocalTime.now().hour * 60 + java.time.LocalTime.now().minute))
+
                                         val slotState = when {
+                                            isPastSlot -> SlotState.BOOKED_BY_OTHER
                                             blockingBooking != null -> {
                                                 if (blockingBooking.expertId == targetExpert.id) {
                                                      SlotState.BOOKED_BY_OTHER
@@ -17923,7 +18617,22 @@ fun PremiumBookingCalendarScreen(
             confirmButton = {
                 Button(
                     onClick = {
+                        val activeDayObj = calendarDays.find { it.key == selectedDay }
+                        val isSelectedDayToday = activeDayObj?.isToday == true
+                        val isSelectedDayPast = try {
+                            activeDayObj?.dateString?.let { java.time.LocalDate.parse(it).isBefore(java.time.LocalDate.now()) } ?: false
+                        } catch (e: Exception) {
+                            false
+                        }
                         val requestedStart = parseTimeToMinutes(startTime)
+                        val isSlotInPast = isSelectedDayPast || (isSelectedDayToday && requestedStart <= (java.time.LocalTime.now().hour * 60 + java.time.LocalTime.now().minute))
+                        
+                        if (isSlotInPast) {
+                            alertMessage = "You cannot book a session in the past."
+                            showBookingConfirmationBySlot = null
+                            return@Button
+                        }
+
                         val requestedEnd = requestedStart + selectedDuration
                         
                         val overlappingBooking = bookingsList.find { b ->
@@ -18275,7 +18984,17 @@ fun PremiumBookingCalendarScreen(
                                             bTiming.contains(rescheduleSelectedDay) && bTiming.contains(startTime) && b.expertId == rescheduleExpert.id
                                         }
 
-                                        val slotState = if (isBooked) SlotState.BOOKED_BY_OTHER else SlotState.AVAILABLE
+                                        val activeDayObj = calendarDays.find { it.key == rescheduleSelectedDay }
+                                        val isSelectedDayToday = activeDayObj?.isToday == true
+                                        val isSelectedDayPast = try {
+                                            activeDayObj?.dateString?.let { java.time.LocalDate.parse(it).isBefore(java.time.LocalDate.now()) } ?: false
+                                        } catch (e: Exception) {
+                                            false
+                                        }
+                                        val slotStartMin = parseTimeToMinutes(startTime)
+                                        val isPastSlot = isSelectedDayPast || (isSelectedDayToday && slotStartMin <= (java.time.LocalTime.now().hour * 60 + java.time.LocalTime.now().minute))
+
+                                        val slotState = if (isBooked || isPastSlot) SlotState.BOOKED_BY_OTHER else SlotState.AVAILABLE
 
                                         Box(
                                             modifier = Modifier.weight(1f)
@@ -18303,7 +19022,21 @@ fun PremiumBookingCalendarScreen(
                         Button(
                             onClick = {
                                 if (bookingToReschedule != null) {
+                                    val activeRescheduleDayObj = calendarDays.find { it.key == rescheduleSelectedDay }
+                                    val isRescheduleDayToday = activeRescheduleDayObj?.isToday == true
+                                    val isRescheduleDayPast = try {
+                                        activeRescheduleDayObj?.dateString?.let { java.time.LocalDate.parse(it).isBefore(java.time.LocalDate.now()) } ?: false
+                                    } catch (e: Exception) {
+                                        false
+                                    }
                                     val requestedStart = parseTimeToMinutes(rescheduleSelectedSlot)
+                                    val isRescheduleSlotInPast = isRescheduleDayPast || (isRescheduleDayToday && requestedStart <= (java.time.LocalTime.now().hour * 60 + java.time.LocalTime.now().minute))
+                                    
+                                    if (isRescheduleSlotInPast) {
+                                        alertMessage = "You cannot reschedule a session into the past."
+                                        return@Button
+                                    }
+
                                     val requestedEnd = requestedStart + bookingToReschedule.durationMinutes
                                     
                                     val overlappingBooking = bookingsList.find { b ->

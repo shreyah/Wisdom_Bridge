@@ -16778,9 +16778,11 @@ fun EventDetailScreen(
 }
 
 enum class SlotState {
-    AVAILABLE,
-    BOOKED_BY_ME,
-    BOOKED_BY_OTHER
+    PAST,                  // State 1: "Past"
+    AVAILABLE,             // State 2: "Available"
+    EXPERT_UNAVAILABLE,    // State 3: "Unavailable"
+    USER_CONFLICT,         // State 4: "You Have a Session"
+    LIVE_NOW               // State 5: "Live Now"
 }
 
 fun parseTimeToMinutes(timeStr: String): Int {
@@ -16811,9 +16813,7 @@ fun SlotPill(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val isBookedByOther = state == SlotState.BOOKED_BY_OTHER
-    val isBookedByMe = state == SlotState.BOOKED_BY_ME
-    val isBlocked = isBookedByOther || isBookedByMe
+    val isBlocked = state == SlotState.PAST || state == SlotState.EXPERT_UNAVAILABLE || state == SlotState.USER_CONFLICT
     
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -16825,19 +16825,23 @@ fun SlotPill(
             .clip(RoundedCornerShape(12.dp))
             .background(
                 color = when {
-                    isBookedByOther -> Color(0xFFE5E5EA) // Premium light grey (Apple-style) for booked by others
-                    isBookedByMe -> Color(0xFFE8E5FA)    // Soft lavender background for booked by current user!
-                    isSelected -> Color(0xFF6200EE)      // Primary purple if selected
-                    else -> Color.White                  // White slot for available!
+                    state == SlotState.PAST -> Color(0xFFF2F2F7)
+                    state == SlotState.EXPERT_UNAVAILABLE -> Color(0xFFE5E5EA)
+                    state == SlotState.USER_CONFLICT -> Color(0xFFE8E5FA)
+                    state == SlotState.LIVE_NOW -> Color(0xFFE8F5E9)
+                    isSelected -> Color(0xFF6200EE)
+                    else -> Color.White
                 }
             )
             .border(
                 width = 1.dp,
                 color = when {
-                    isBookedByOther -> Color.Transparent
-                    isBookedByMe -> Color(0xFF9575CD)    // Strong lavender border
+                    state == SlotState.PAST -> Color.Transparent
+                    state == SlotState.EXPERT_UNAVAILABLE -> Color.Transparent
+                    state == SlotState.USER_CONFLICT -> Color(0xFF9575CD)
+                    state == SlotState.LIVE_NOW -> Color(0xFF2E7D32)
                     isSelected -> Color.Transparent
-                    else -> Color(0xFFE2DDF8)            // Very subtle lavender border for available white slots
+                    else -> Color(0xFFE2DDF8)
                 },
                 shape = RoundedCornerShape(12.dp)
             )
@@ -16852,11 +16856,11 @@ fun SlotPill(
                     )
                 }
             )
-            .padding(vertical = if (isBookedByOther || isBookedByMe) 8.dp else 12.dp, horizontal = 12.dp),
+            .padding(vertical = 8.dp, horizontal = 12.dp),
         contentAlignment = Alignment.Center
     ) {
-        when {
-            isBookedByOther -> {
+        when (state) {
+            SlotState.PAST -> {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
@@ -16869,7 +16873,7 @@ fun SlotPill(
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                     Text(
-                        text = "BOOKED",
+                        text = "PAST",
                         fontSize = 8.5.sp,
                         fontWeight = FontWeight.Black,
                         color = Color(0xFF8E8E93),
@@ -16878,7 +16882,29 @@ fun SlotPill(
                     )
                 }
             }
-            isBookedByMe -> {
+            SlotState.EXPERT_UNAVAILABLE -> {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = startTime,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF8E8E93),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Text(
+                        text = "UNAVAILABLE",
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color(0xFF8E8E93),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
+            SlotState.USER_CONFLICT -> {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
@@ -16891,33 +16917,68 @@ fun SlotPill(
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                     Text(
-                        text = "YOUR SESSION",
-                        fontSize = 8.5.sp,
+                        text = "YOU HAVE A SESSION",
+                        fontSize = 8.sp,
                         fontWeight = FontWeight.Black,
                         color = Color(0xFF6200EE),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        letterSpacing = 0.3.sp
+                    )
+                }
+            }
+            SlotState.LIVE_NOW -> {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = startTime,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF2E7D32),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Text(
+                        text = "LIVE NOW",
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color(0xFF2E7D32),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         letterSpacing = 0.5.sp
                     )
                 }
             }
-            else -> {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
+            SlotState.AVAILABLE -> {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    if (isSelected) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        if (isSelected) {
+                            Text(
+                                text = "✓ ",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = Color.White
+                            )
+                        }
                         Text(
-                            text = "✓ ",
+                            text = startTime,
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
+                            fontWeight = FontWeight.Bold,
+                            color = if (isSelected) Color.White else Color(0xFF1C1C1E)
                         )
                     }
                     Text(
-                        text = startTime,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isSelected) Color.White else Color(0xFF1C1C1E)
+                        text = "AVAILABLE",
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Black,
+                        color = if (isSelected) Color.White.copy(alpha = 0.8f) else Color(0xFF6200EE),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        letterSpacing = 0.5.sp
                     )
                 }
             }
@@ -17628,20 +17689,26 @@ fun PremiumBookingCalendarScreen(
                                                 border = BorderStroke(1.dp, categoryDetails.accentColor.copy(alpha = 0.5f)),
                                                 shape = RoundedCornerShape(16.dp)
                                             ) {
-                                                Row(
-                                                    modifier = Modifier.height(IntrinsicSize.Min)
-                                                ) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .width(4.dp)
-                                                            .fillMaxHeight()
-                                                            .background(categoryDetails.accentColor)
-                                                    )
-                                                    Column(modifier = Modifier.fillMaxWidth()) {
-                                                        Row(
-                                                            modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = if (booking.status.uppercase() == "UPCOMING") 8.dp else 14.dp),
-                                                            verticalAlignment = Alignment.CenterVertically
-                                                        ) {
+                                                Box(modifier = Modifier.fillMaxWidth()) {
+                                                    Row(
+                                                        modifier = Modifier.height(IntrinsicSize.Min)
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .width(4.dp)
+                                                                .fillMaxHeight()
+                                                                .background(categoryDetails.accentColor)
+                                                        )
+                                                        Column(modifier = Modifier.fillMaxWidth()) {
+                                                            Row(
+                                                                modifier = Modifier.padding(
+                                                                    start = 14.dp,
+                                                                    end = if (booking.status.uppercase() == "UPCOMING" && isPersonalCalendar) 32.dp else 14.dp,
+                                                                    top = 14.dp,
+                                                                    bottom = if (booking.status.uppercase() == "UPCOMING") 8.dp else 14.dp
+                                                                ),
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
                                                             Box(
                                                                 modifier = Modifier
                                                                     .size(46.dp)
@@ -17757,9 +17824,28 @@ fun PremiumBookingCalendarScreen(
                                                         }
                                                     }
                                                 }
+                                                if (booking.status.uppercase() == "UPCOMING" && isPersonalCalendar) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .align(Alignment.TopEnd)
+                                                            .padding(top = 10.dp, end = 10.dp)
+                                                            .clickable {
+                                                                activeRescheduleBookingId = booking.id
+                                                            }
+                                                            .padding(4.dp)
+                                                            .testTag("edit_shortcut_history_${booking.id}"),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = "✏️",
+                                                            fontSize = 14.sp
+                                                        )
+                                                    }
+                                                }
                                             }
                                         }
                                     }
+                                }
                                 } else {
                                     // Just render selected day's bookings chronologically as cards directly (with no groups)
                                     items(sortedActiveList.size) { index ->
@@ -17774,20 +17860,26 @@ fun PremiumBookingCalendarScreen(
                                             border = BorderStroke(1.dp, categoryDetails.accentColor.copy(alpha = 0.5f)),
                                             shape = RoundedCornerShape(16.dp)
                                         ) {
-                                            Row(
-                                                modifier = Modifier.height(IntrinsicSize.Min)
-                                            ) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .width(4.dp)
-                                                        .fillMaxHeight()
-                                                        .background(categoryDetails.accentColor)
-                                                )
-                                                Column(modifier = Modifier.fillMaxWidth()) {
-                                                    Row(
-                                                        modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = if (booking.status.uppercase() == "UPCOMING") 8.dp else 14.dp),
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
+                                            Box(modifier = Modifier.fillMaxWidth()) {
+                                                Row(
+                                                    modifier = Modifier.height(IntrinsicSize.Min)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .width(4.dp)
+                                                            .fillMaxHeight()
+                                                            .background(categoryDetails.accentColor)
+                                                    )
+                                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                                        Row(
+                                                            modifier = Modifier.padding(
+                                                                start = 14.dp,
+                                                                end = if (booking.status.uppercase() == "UPCOMING" && isPersonalCalendar) 32.dp else 14.dp,
+                                                                top = 14.dp,
+                                                                bottom = if (booking.status.uppercase() == "UPCOMING") 8.dp else 14.dp
+                                                            ),
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
                                                         Box(
                                                             modifier = Modifier
                                                                 .size(46.dp)
@@ -17903,10 +17995,29 @@ fun PremiumBookingCalendarScreen(
                                                     }
                                                 }
                                             }
+                                            if (booking.status.uppercase() == "UPCOMING" && isPersonalCalendar) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .align(Alignment.TopEnd)
+                                                        .padding(top = 10.dp, end = 10.dp)
+                                                        .clickable {
+                                                            activeRescheduleBookingId = booking.id
+                                                        }
+                                                        .padding(4.dp)
+                                                        .testTag("edit_shortcut_simple_${booking.id}"),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = "✏️",
+                                                        fontSize = 14.sp
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }
+                        }
                         } else {
                             val isSelectedDayToday = calendarDays.find { it.key == selectedDay }?.isToday == true
                             val currentMinutes = try {
@@ -17988,25 +18099,28 @@ fun PremiumBookingCalendarScreen(
                                                 border = BorderStroke(1.dp, categoryDetails.accentColor.copy(alpha = 0.5f)),
                                                 shape = RoundedCornerShape(16.dp)
                                             ) {
-                                                Row(
-                                                    modifier = Modifier.fillMaxHeight()
-                                                ) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .width(4.dp)
-                                                            .fillMaxHeight()
-                                                            .background(categoryDetails.accentColor)
-                                                    )
-                                                    Column(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .fillMaxHeight()
-                                                            .padding(
-                                                                horizontal = 12.dp,
-                                                                vertical = if (booking.durationMinutes <= 45) 6.dp else 12.dp
-                                                            ),
-                                                        verticalArrangement = if (booking.durationMinutes <= 45) Arrangement.Center else Arrangement.SpaceBetween
+                                                Box(modifier = Modifier.fillMaxSize()) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxHeight()
                                                     ) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .width(4.dp)
+                                                                .fillMaxHeight()
+                                                                .background(categoryDetails.accentColor)
+                                                        )
+                                                        Column(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .fillMaxHeight()
+                                                                .padding(
+                                                                    start = 12.dp,
+                                                                    end = if (booking.status.uppercase() == "UPCOMING" && isPersonalCalendar) 32.dp else 12.dp,
+                                                                    top = if (booking.durationMinutes <= 45) 6.dp else 12.dp,
+                                                                    bottom = if (booking.durationMinutes <= 45) 6.dp else 12.dp
+                                                                ),
+                                                            verticalArrangement = if (booking.durationMinutes <= 45) Arrangement.Center else Arrangement.SpaceBetween
+                                                        ) {
                                                         Row(
                                                             modifier = Modifier.fillMaxWidth(),
                                                             verticalAlignment = Alignment.CenterVertically
@@ -18150,7 +18264,26 @@ fun PremiumBookingCalendarScreen(
                                                         }
                                                     }
                                                 }
+                                                if (booking.status.uppercase() == "UPCOMING" && isPersonalCalendar) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .align(Alignment.TopEnd)
+                                                            .padding(top = 10.dp, end = 10.dp)
+                                                            .clickable {
+                                                                activeRescheduleBookingId = booking.id
+                                                            }
+                                                            .padding(4.dp)
+                                                            .testTag("edit_shortcut_timeline_${booking.id}"),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = "✏️",
+                                                            fontSize = 14.sp
+                                                        )
+                                                    }
+                                                }
                                             }
+                                        }
                                         }
                                     }
                                 } else {
@@ -18365,12 +18498,12 @@ fun PremiumBookingCalendarScreen(
                                         val isPastSlot = isSelectedDayPast || (isSelectedDayToday && slotStartMin <= (java.time.LocalTime.now().hour * 60 + java.time.LocalTime.now().minute))
 
                                         val slotState = when {
-                                            isPastSlot -> SlotState.BOOKED_BY_OTHER
+                                            isPastSlot -> SlotState.PAST
                                             blockingBooking != null -> {
                                                 if (blockingBooking.expertId == targetExpert.id) {
-                                                     SlotState.BOOKED_BY_OTHER
+                                                     SlotState.EXPERT_UNAVAILABLE
                                                 } else {
-                                                     SlotState.BOOKED_BY_ME
+                                                     SlotState.USER_CONFLICT
                                                 }
                                             }
                                             else -> SlotState.AVAILABLE
@@ -18994,7 +19127,36 @@ fun PremiumBookingCalendarScreen(
                                         val slotStartMin = parseTimeToMinutes(startTime)
                                         val isPastSlot = isSelectedDayPast || (isSelectedDayToday && slotStartMin <= (java.time.LocalTime.now().hour * 60 + java.time.LocalTime.now().minute))
 
-                                        val slotState = if (isBooked || isPastSlot) SlotState.BOOKED_BY_OTHER else SlotState.AVAILABLE
+                                        val rescheduleBlockingBooking = bookingsList.find { b ->
+                                             if (b.status == "cancelled" || b.id == bookingToReschedule?.id) return@find false
+                                             val bTiming = b.timing.uppercase()
+                                             val isSameDay = bTiming.contains(rescheduleSelectedDay) || 
+                                               (rescheduleSelectedDay == today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US).uppercase().take(3) && bTiming.contains("TODAY"))
+                                             if (!isSameDay) return@find false
+
+                                             val parsedDayAndTime = parseBookingDayAndTime(b, calendarDays) ?: return@find false
+                                             val bStartMin = parsedDayAndTime.second
+                                             val bEndMin = bStartMin + b.durationMinutes
+
+                                             val duration = bookingToReschedule?.durationMinutes ?: 30
+                                             val overlap = slotStartMin < bEndMin && bStartMin < (slotStartMin + duration)
+                                             overlap
+                                         }
+
+                                         val resBStartMin = rescheduleBlockingBooking?.let { parseBookingDayAndTime(it, calendarDays) }?.second ?: 0
+                                         val resBEndMin = resBStartMin + (rescheduleBlockingBooking?.durationMinutes ?: 0)
+                                         val isResActive = isSelectedDayToday && rescheduleBlockingBooking != null && 
+                                             (java.time.LocalTime.now().hour * 60 + java.time.LocalTime.now().minute).let { nowMin ->
+                                                 nowMin >= resBStartMin && nowMin < resBEndMin
+                                             }
+
+                                         val slotState = when {
+                                             isResActive -> SlotState.LIVE_NOW
+                                             isPastSlot -> SlotState.PAST
+                                             isBooked -> SlotState.EXPERT_UNAVAILABLE
+                                             rescheduleBlockingBooking != null -> SlotState.USER_CONFLICT
+                                             else -> SlotState.AVAILABLE
+                                         }
 
                                         Box(
                                             modifier = Modifier.weight(1f)

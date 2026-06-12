@@ -36,6 +36,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -69,7 +71,9 @@ fun AvatarImage(
     modifier: Modifier = Modifier,
     size: Int = 40,
     isSpeaking: Boolean = false,
-    wavePower: Float = 0.0f
+    wavePower: Float = 0.0f,
+    category: String? = null,
+    avatarUrl: String? = null
 ) {
     val speakBorder = if (isSpeaking && wavePower > 0.1f) {
         val animWidth by animateDpAsState(
@@ -85,7 +89,9 @@ fun AvatarImage(
     ProceduralLinkedInAvatar(
         name = name,
         sizeDp = size,
-        modifier = modifier.then(speakBorder)
+        modifier = modifier.then(speakBorder),
+        category = category,
+        avatarUrl = avatarUrl
     )
 }
 
@@ -155,161 +161,158 @@ fun ExpertCoverPhoto(
 }
 
 @Composable
+fun DefaultWisdomBridgeMentorAvatar(
+    name: String,
+    category: String?,
+    modifier: Modifier = Modifier
+) {
+    val initials = remember(name) {
+        name.trim().split("\\s+".toRegex())
+            .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+            .take(2)
+            .joinToString("")
+            .let { if (it.isEmpty()) "M" else it }
+    }
+
+    val themeGradients = remember(name) {
+        val seed = name.hashCode().let { if (it < 0) -it else it }
+        val gradients = listOf(
+            Pair(Color(0xFFFFECEF), Color(0xFFFFD5DC)), // Peach/rose
+            Pair(Color(0xFFECE5FD), Color(0xFFD1C4E9)), // Lavender purple
+            Pair(Color(0xFFE3F2FD), Color(0xFFBBDEFB)), // Soft blue
+            Pair(Color(0xFFE8F5E9), Color(0xFFC8E6C9)), // Warm mint green
+            Pair(Color(0xFFFFFAD6), Color(0xFFFFF176))  // Soft sun gold
+        )
+        gradients[seed % gradients.size]
+    }
+
+    val textDarkColor = Color(0xFF4A4557)
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(themeGradients.first, themeGradients.second)
+                ),
+                shape = CircleShape
+            )
+            .border(1.dp, Color(0xFF6200EE).copy(alpha = 0.12f), CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            val emoji = when (category?.lowercase()?.trim()) {
+                "maths", "science", "physics", "education & tutoring" -> "📐"
+                "ayurveda", "wellness", "health_wellness" -> "🌿"
+                "dance", "music", "arts_culture" -> "🎵"
+                "banking", "finance", "banking_finance", "legal", "financial literacy", "legal knowledge" -> "💼"
+                "languages", "physiotherapy" -> "🗣️"
+                else -> "🌟"
+            }
+            Text(
+                text = emoji,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(bottom = 1.dp)
+            )
+            Text(
+                text = initials,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = textDarkColor,
+                letterSpacing = 0.5.sp
+            )
+        }
+    }
+}
+
+@Composable
 fun ProceduralLinkedInAvatar(
     name: String,
     sizeDp: Int = 40,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    category: String? = null,
+    avatarUrl: String? = null
 ) {
-    val seed = name.hashCode().let { if (it < 0) -it else it }
-    // Determine professional/personable color palette
-    val palettes = listOf(
-        // Light bg, primary suit, neck/tie color accent
-        Triple(Color(0xFFE3F2FD), Color(0xFF1E88E5), Color(0xFF3F51B5)),
-        Triple(Color(0xFFEDE7F6), Color(0xFF5E35B1), Color(0xFF9575CD)),
-        Triple(Color(0xFFE8F5E9), Color(0xFF2E7D32), Color(0xFF4CAF50)),
-        Triple(Color(0xFFFFF3E0), Color(0xFFE65100), Color(0xFFFFB74D)),
-        Triple(Color(0xFFFCE4EC), Color(0xFFD81B60), Color(0xFFEC407A)),
-        Triple(Color(0xFFE0F2F1), Color(0xFF00796B), Color(0xFF26A69A))
-    )
-    val palette = palettes[seed % palettes.size]
-    
-    val isFemale = name.contains("Gauri") || name.contains("Savita") || name.contains("Sudha") ||
-                   name.contains("Devyani") || name.contains("Nirmala") || name.contains("Begum") ||
-                   name.contains("Kavitha") || name.contains("Nandini") || name.contains("Gail") ||
-                   name.contains("Shashi") || name.contains("Kalyani") || name.contains("Urmila") ||
-                   name.contains("Leela") || name.contains("Priya") || name.contains("Nisha") || name.contains("Ma ")
-
     val sizeModifier = if (sizeDp > 0) Modifier.size(sizeDp.dp) else Modifier
-
+    
+    val style = when (category?.lowercase()?.trim()) {
+        "maths", "science", "career", "physics", "maths & science", "education & tutoring" -> "avataaars"
+        "ayurveda", "wellness", "health_wellness" -> "avataaars"
+        "dance", "music", "arts_culture" -> "personas"
+        "banking", "finance", "banking_finance", "legal", "financial literacy", "legal knowledge" -> "lorelei"
+        "languages", "physiotherapy" -> "avataaars"
+        else -> {
+            val lower = name.lowercase()
+            when {
+                lower.contains("rajesh") || lower.contains("ramesh") || lower.contains("anand") || lower.contains("satya") || lower.contains("vipin") -> "avataaars"
+                lower.contains("murthy") || lower.contains("sudha") || lower.contains("wellness") -> "avataaars"
+                lower.contains("gauri") || lower.contains("cooking") || lower.contains("recipe") -> "avataaars"
+                lower.contains("gail") || lower.contains("law") || lower.contains("legal") -> "lorelei"
+                lower.contains("sharma") -> "avataaars"
+                else -> {
+                    val seed = name.hashCode().let { if (it < 0) -it else it }
+                    when (seed % 3) {
+                        0 -> "avataaars"
+                        1 -> "personas"
+                        else -> "lorelei"
+                    }
+                }
+            }
+        }
+    }
+    
+    val seedToUse = if (!avatarUrl.isNullOrEmpty() && !avatarUrl.startsWith("http") && !avatarUrl.contains("img_")) {
+        avatarUrl
+    } else {
+        name
+    }
+    
+    val isLocalAsset = !avatarUrl.isNullOrEmpty() && (avatarUrl.contains("chachi") || avatarUrl.contains("img_"))
+    val modelSrc: Any = when {
+        isLocalAsset -> {
+            R.drawable.img_ai_chachi
+        }
+        !avatarUrl.isNullOrEmpty() && avatarUrl.startsWith("http") -> {
+            avatarUrl
+        }
+        else -> {
+            val encodedSeed = android.net.Uri.encode(seedToUse)
+            "https://api.dicebear.com/7.x/$style/png?seed=$encodedSeed&backgroundColor=ffdfbf,ffd5dc,d1d4f9,c0aede,b6e3f4"
+        }
+    }
+    
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val imageLoader = remember(context) {
+        coil.ImageLoader.Builder(context)
+            .components {
+                add(coil.decode.SvgDecoder.Factory())
+            }
+            .build()
+    }
+    
     Box(
         modifier = modifier
             .then(sizeModifier)
             .clip(CircleShape)
-            .background(palette.first)
-            .border(1.5.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+            .background(Color(0xFFF1F0FD)),
+        contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            
-            // 1. Draw Suit shoulders/attire (curved path at the bottom)
-            val suitColor = palette.second
-            val skinTone = Color(0xFFFCD0B4) // Warm senior skin tone
-            val hairColor = if (seed % 3 == 0) Color(0xFF888888) else if (seed % 3 == 1) Color(0xFF4E342E) else Color(0xFFE0E0E0)
-            
-            val suitPath = androidx.compose.ui.graphics.Path().apply {
-                moveTo(0f, h)
-                quadraticTo(w * 0.1f, h * 0.65f, w * 0.3f, h * 0.65f)
-                lineTo(w * 0.7f, h * 0.65f)
-                quadraticTo(w * 0.9f, h * 0.65f, w, h)
-                close()
+        coil.compose.SubcomposeAsyncImage(
+            model = modelSrc,
+            contentDescription = "Avatar for $name",
+            imageLoader = imageLoader,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            loading = {
+                DefaultWisdomBridgeMentorAvatar(name, category)
+            },
+            error = {
+                DefaultWisdomBridgeMentorAvatar(name, category)
             }
-            drawPath(suitPath, color = suitColor)
-            
-            // 2. Shirt collar V-neck
-            val shirtPath = androidx.compose.ui.graphics.Path().apply {
-                moveTo(w * 0.4f, h * 0.65f)
-                lineTo(w * 0.5f, h * 0.78f)
-                lineTo(w * 0.6f, h * 0.65f)
-                close()
-            }
-            drawPath(shirtPath, color = Color.White)
-            
-            // Tie accent (for male professional)
-            if (!isFemale && seed % 2 == 0) {
-                val tiePath = androidx.compose.ui.graphics.Path().apply {
-                    moveTo(w * 0.46f, h * 0.66f)
-                    lineTo(w * 0.54f, h * 0.66f)
-                    lineTo(w * 0.52f, h * 0.88f)
-                    lineTo(w * 0.5f, h * 0.94f)
-                    lineTo(w * 0.48f, h * 0.88f)
-                    close()
-                }
-                drawPath(tiePath, color = palette.third)
-            }
-            
-            // 3. Neck
-            drawRect(
-                color = skinTone.copy(alpha = 0.92f),
-                topLeft = androidx.compose.ui.geometry.Offset(w * 0.42f, h * 0.45f),
-                size = androidx.compose.ui.geometry.Size(w * 0.16f, h * 0.2f)
-            )
-            
-            // 4. Face/Head
-            drawCircle(
-                color = skinTone,
-                radius = w * 0.22f,
-                center = androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.38f)
-            )
-            
-            if (isFemale) {
-                // Female professional hair
-                val hairPath = androidx.compose.ui.graphics.Path().apply {
-                    moveTo(w * 0.25f, h * 0.38f)
-                    quadraticTo(w * 0.22f, h * 0.15f, w * 0.5f, h * 0.12f)
-                    quadraticTo(w * 0.78f, h * 0.15f, w * 0.75f, h * 0.38f)
-                    quadraticTo(w * 0.85f, h * 0.52f, w * 0.8f, h * 0.62f)
-                    quadraticTo(w * 0.75f, h * 0.3f, w * 0.5f, h * 0.22f)
-                    quadraticTo(w * 0.25f, h * 0.3f, w * 0.2f, h * 0.62f)
-                    quadraticTo(w * 0.15f, h * 0.52f, w * 0.25f, h * 0.38f)
-                }
-                drawPath(hairPath, color = hairColor)
-                
-                // Traditional bindi for Indian aesthetic warmth
-                drawCircle(
-                    color = Color(0xFFC62828),
-                    radius = w * 0.024f,
-                    center = androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.33f)
-                )
-            } else {
-                // Male professional short hair crop
-                val hairPath = androidx.compose.ui.graphics.Path().apply {
-                    moveTo(w * 0.25f, h * 0.32f)
-                    quadraticTo(w * 0.25f, h * 0.14f, w * 0.5f, h * 0.12f)
-                    quadraticTo(w * 0.75f, h * 0.14f, w * 0.75f, h * 0.32f)
-                    quadraticTo(w * 0.70f, h * 0.22f, w * 0.5f, h * 0.21f)
-                    quadraticTo(w * 0.30f, h * 0.22f, w * 0.25f, h * 0.32f)
-                }
-                drawPath(hairPath, color = hairColor)
-            }
-            
-            // 5. Stylized spectacles/glasses for wisdom look
-            if (seed % 2 == 0) {
-                val glassTint = Color(0xFF263238)
-                // Left frame circle
-                drawCircle(
-                    color = glassTint,
-                    radius = w * 0.065f,
-                    center = androidx.compose.ui.geometry.Offset(w * 0.42f, h * 0.38f),
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.8f)
-                )
-                // Right frame circle
-                drawCircle(
-                    color = glassTint,
-                    radius = w * 0.065f,
-                    center = androidx.compose.ui.geometry.Offset(w * 0.58f, h * 0.38f),
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.8f)
-                )
-                // Middle bridge
-                drawLine(
-                    color = glassTint,
-                    start = androidx.compose.ui.geometry.Offset(w * 0.485f, h * 0.38f),
-                    end = androidx.compose.ui.geometry.Offset(w * 0.515f, h * 0.38f),
-                    strokeWidth = 2.2f
-                )
-            }
-            
-            // 6. Natural warm friendly smiling mouth
-            val mouthPath = androidx.compose.ui.graphics.Path().apply {
-                moveTo(w * 0.44f, h * 0.46f)
-                quadraticTo(w * 0.5f, h * 0.51f, w * 0.56f, h * 0.46f)
-            }
-            drawPath(
-                path = mouthPath,
-                color = Color(0xFFD32F2F).copy(alpha = 0.85f),
-                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.4f)
-            )
-        }
+        )
     }
 }
 
@@ -1570,6 +1573,67 @@ data class CalendarDay(
     val dateString: String = ""
 )
 
+fun parseBookingDayAndTime(booking: Booking, calendarDays: List<CalendarDay>): Pair<String, Int>? {
+    val timing = booking.timing.uppercase(java.util.Locale.US)
+    val dayPart: String
+    val timePart: String
+    if (timing.contains("•")) {
+        dayPart = timing.substringBefore("•").trim()
+        val afterDot = timing.substringAfter("•").trim()
+        timePart = if (afterDot.contains("(")) afterDot.substringBefore("(").trim() else afterDot.trim()
+    } else {
+        if (timing.contains(",")) {
+            dayPart = timing.substringBefore(",").trim()
+            timePart = timing.substringAfter(",").trim()
+        } else {
+            return null
+        }
+    }
+    
+    val normalizedDay = when {
+        dayPart.contains("MON") -> "MON"
+        dayPart.contains("TUE") -> "TUE"
+        dayPart.contains("WED") -> "WED"
+        dayPart.contains("THU") -> "THU"
+        dayPart.contains("FRI") -> "FRI"
+        dayPart.contains("SAT") -> "SAT"
+        dayPart.contains("SUN") -> "SUN"
+        dayPart.contains("YESTERDAY") -> {
+            val yesterday = java.time.LocalDate.now().minusDays(1)
+            yesterday.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US).uppercase().take(3)
+        }
+        dayPart.contains("TODAY") -> {
+            val today = java.time.LocalDate.now()
+            today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US).uppercase().take(3)
+        }
+        else -> ""
+    }
+    
+    if (normalizedDay.isEmpty()) return null
+    val startMin = parseTimeToMinutes(timePart)
+    return Pair(normalizedDay, startMin)
+}
+
+fun sortBookingsChronologically(bookings: List<Booking>, calendarDays: List<CalendarDay>): List<Booking> {
+    return bookings.sortedWith(Comparator { b1, b2 ->
+        val p1 = parseBookingDayAndTime(b1, calendarDays)
+        val p2 = parseBookingDayAndTime(b2, calendarDays)
+        
+        if (p1 == null && p2 == null) return@Comparator 0
+        if (p1 == null) return@Comparator 1
+        if (p2 == null) return@Comparator -1
+        
+        val dayIndex1 = calendarDays.indexOfFirst { it.key == p1.first }
+        val dayIndex2 = calendarDays.indexOfFirst { it.key == p2.first }
+        
+        if (dayIndex1 != dayIndex2) {
+            dayIndex1.compareTo(dayIndex2)
+        } else {
+            p1.second.compareTo(p2.second)
+        }
+    })
+}
+
 data class BookingConfirmationData(
     val expertName: String,
     val title: String,
@@ -1628,7 +1692,7 @@ fun formatTimingWithDate(timing: String): String {
 }
 
 @Composable
-fun WisdomBridgeHorizontalCalendar(
+fun BookingCalendar(
     selectedDayKey: String,
     daysList: List<CalendarDay>,
     bookingsList: List<Booking>,
@@ -1647,93 +1711,109 @@ fun WisdomBridgeHorizontalCalendar(
         state = calendarListState,
         modifier = modifier
             .fillMaxWidth()
-            .background(Color.White.copy(alpha = 0.6f), RoundedCornerShape(26.dp))
-            .border(BorderStroke(1.dp, Color.White), RoundedCornerShape(26.dp))
-            .padding(vertical = 8.dp, horizontal = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+            .background(Color.Transparent)
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         items(daysList) { day ->
             val isSelected = selectedDayKey.uppercase() == day.key.uppercase()
-            val hasBooking = bookingsList.any { b ->
-                val bTiming = b.timing.lowercase()
-                val dayKey = day.key.lowercase()
-                val dayNameFull = day.fullName.lowercase()
+            
+            val dayBookings = bookingsList.filter { b ->
+                val bTiming = b.timing.uppercase()
+                val dayKey = day.key.uppercase()
+                val dayNameFull = day.fullName.uppercase()
                 bTiming.contains(dayKey) || bTiming.contains(dayNameFull) ||
-                (day.isToday && bTiming.contains("today")) ||
-                (bTiming.contains("tomorrow") && daysList.indexOf(day) == (daysList.indexOfFirst { it.isToday } + 1) % daysList.size)
+                (day.isToday && bTiming.contains("TODAY"))
             }
+            
+            // Availability determination: if >= 10 bookings on this day, no availability (Grey dot). Otherwise green dot.
+            val isAvailable = dayBookings.size < 8
 
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .width(55.dp)
-                    .padding(horizontal = 2.dp)
-                    .shadow(
-                        elevation = if (isSelected) 3.dp else 0.dp,
-                        shape = RoundedCornerShape(20.dp)
-                    )
-                    .background(
-                        brush = if (isSelected) Brush.linearGradient(
-                            colors = listOf(Color(0xFFF8E7EE), Color(0xFFEADCF8))
-                        ) else if (day.isToday) Brush.linearGradient(
-                            colors = listOf(Color.White.copy(alpha = 0.9f), Color.White.copy(alpha = 0.8f))
-                        ) else Brush.linearGradient(
-                            colors = listOf(Color.Transparent, Color.Transparent)
-                        ),
-                        shape = RoundedCornerShape(20.dp)
-                    )
-                    .border(
-                        width = if (day.isToday && !isSelected) 1.dp else 0.dp,
-                        color = if (day.isToday && !isSelected) Color(0xFFEADCF8) else Color.Transparent,
-                        shape = RoundedCornerShape(20.dp)
-                    )
+                    .width(52.dp)
+                    .clip(RoundedCornerShape(16.dp))
                     .clickable { onDaySelected(day) }
-                    .padding(vertical = 8.dp)
-                    .testTag("calendar_day_${day.key.uppercase()}")
+                    .padding(vertical = 6.dp)
+                    .testTag("booking_calendar_day_${day.key.uppercase()}")
             ) {
+                // Day Tag short, e.g. "MON"
                 Text(
                     text = day.key.uppercase(),
                     fontSize = 11.sp,
-                    fontWeight = if (isSelected || day.isToday) FontWeight.Bold else FontWeight.Normal,
-                    color = if (isSelected) Color(0xFF2C2625) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    fontWeight = FontWeight.Bold,
+                    color = if (isSelected) Color(0xFF6200EE) else Color(0xFF8E8E93),
+                    letterSpacing = 0.5.sp
                 )
                 
                 Spacer(modifier = Modifier.height(6.dp))
 
+                // Date Number inside solid circle
                 Box(
                     modifier = Modifier
-                        .size(28.dp)
+                        .size(42.dp)
                         .background(
-                            color = if (isSelected) Color.White.copy(alpha = 0.5f)
-                                    else Color.Transparent,
+                            color = if (isSelected) Color(0xFF6200EE) else Color.Transparent, // Velvet purple filled circle for selected
                             shape = CircleShape
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = day.labelNum,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isSelected) Color(0xFF2C2625)
-                                else if (day.isToday) Color(0xFF705DA3)
-                                else MaterialTheme.colorScheme.onSurface
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Text(
+                            text = day.labelNum,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isSelected) Color.White else Color.Black
+                        )
+                        
+                        if (day.isToday) {
+                            // Today's date subtle indicator dot inside or below the number
+                            Box(
+                                modifier = Modifier
+                                    .size(4.dp)
+                                    .background(if (isSelected) Color.White else Color(0xFF6200EE), CircleShape)
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(4.dp))
 
+                // Availability dot (Green if available, Grey if full)
                 Box(
                     modifier = Modifier
                         .size(6.dp)
                         .background(
-                            color = if (hasBooking) Color(0xFF8B1A1A) else Color.Gray.copy(alpha = 0.25f),
+                            color = if (isAvailable) Color(0xFF2ECC71) else Color(0xFFC7C7CC),
                             shape = CircleShape
                         )
                 )
             }
         }
     }
+}
+
+@Composable
+fun WisdomBridgeHorizontalCalendar(
+    selectedDayKey: String,
+    daysList: List<CalendarDay>,
+    bookingsList: List<Booking>,
+    onDaySelected: (CalendarDay) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    BookingCalendar(
+        selectedDayKey = selectedDayKey,
+        daysList = daysList,
+        bookingsList = bookingsList,
+        onDaySelected = onDaySelected,
+        modifier = modifier
+    )
 }
 
 fun Modifier.whiteCardShadow(): Modifier = this.drawBehind {
@@ -2836,13 +2916,18 @@ fun HomeDashboardScreen(
                                                     .size(52.dp)
                                                     .align(Alignment.CenterVertically)
                                             ) {
+                                                val avatarUrlToPass = when (session) {
+                                                    is MyScheduleItem.TutoringSession -> session.booking.expertAvatar
+                                                    is MyScheduleItem.WorkshopSession -> session.event.hostAvatar
+                                                }
                                                 AvatarImage(
                                                     name = nameForAvatar,
                                                     size = 50,
                                                     modifier = Modifier
                                                         .size(50.dp)
                                                         .shadow(1.5.dp, CircleShape)
-                                                        .border(1.2.dp, borderHighlightColor, CircleShape)
+                                                        .border(1.2.dp, borderHighlightColor, CircleShape),
+                                                    avatarUrl = avatarUrlToPass
                                                 )
                                                 Box(
                                                     modifier = Modifier
@@ -3316,8 +3401,11 @@ fun HomeDashboardScreen(
                         (activeDayObject.isToday && bTiming.contains("today")) ||
                         (bTiming.contains("tomorrow") && calendarDays.indexOf(activeDayObject) == (calendarDays.indexOfFirst { it.isToday } + 1) % calendarDays.size)
                     }
+                    val bookingsForDaySorted = remember(bookingsForDay, calendarDays) {
+                        sortBookingsChronologically(bookingsForDay, calendarDays)
+                    }
 
-                    if (eventsForDay.isEmpty() && bookingsForDay.isEmpty()) {
+                    if (eventsForDay.isEmpty() && bookingsForDaySorted.isEmpty()) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
@@ -3340,7 +3428,7 @@ fun HomeDashboardScreen(
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             // First display the 1:1 Booked lessons
-                            bookingsForDay.forEach { item ->
+                            bookingsForDaySorted.forEach { item ->
                                 val matchedExpert = experts.find { it.id == item.expertId }
                                 val topicLower = (matchedExpert?.topic ?: "").lowercase()
                                 
@@ -3378,12 +3466,17 @@ fun HomeDashboardScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Box(
-                                            modifier = Modifier
-                                                .size(40.dp)
-                                                .background(borderColor.copy(alpha = 0.2f), CircleShape),
-                                            contentAlignment = Alignment.Center
+                                            modifier = Modifier.size(44.dp)
                                         ) {
-                                            Text(emoji, fontSize = 20.sp)
+                                            AvatarImage(
+                                                name = item.expertName,
+                                                size = 44,
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .shadow(1.5.dp, CircleShape)
+                                                    .border(1.2.dp, borderColor, CircleShape),
+                                                avatarUrl = item.expertAvatar
+                                            )
                                         }
                                         Spacer(modifier = Modifier.width(12.dp))
                                         Column(modifier = Modifier.weight(1f)) {
@@ -8441,6 +8534,8 @@ fun LearnAndMentorScreen(
                                     onActionTriggered = { actionType ->
                                         if (actionType == "Follow_Trigger") {
                                             viewModel.toggleFollowExpert(expert.id)
+                                        } else if (actionType == "Book") {
+                                            viewModel.openScheduler(expert.id)
                                         } else {
                                             activeActionExpert = expert
                                             activeActionType = actionType
@@ -8784,179 +8879,180 @@ fun ExpertCardItem(
     onViewProfile: () -> Unit,
     onActionTriggered: (String) -> Unit
 ) {
+    val rate = if (expert.flatSessionFee > 0) expert.flatSessionFee else 100
+    val nextSlotString = remember(expert.id) {
+        val hash = java.lang.Math.abs(expert.name.hashCode())
+        val hStr = when (hash % 6) {
+            0 -> "10:00 AM"
+            1 -> "11:30 AM"
+            2 -> "2:00 PM"
+            3 -> "3:30 PM"
+            4 -> "5:00 PM"
+            else -> "6:30 PM"
+        }
+        val isToday = (hash % 2) == 0
+        val dayLabel = if (isToday) "Today" else "Tomorrow"
+        "$dayLabel • $hStr"
+    }
+
     Card(
         colors = CardDefaults.cardColors(containerColor = PastelBlueCard),
         border = BorderStroke(1.dp, Color(0xFFDDE8FF).copy(alpha = 0.5f)),
-        shape = RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(24.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(2.dp, RoundedCornerShape(28.dp))
+            .shadow(2.dp, RoundedCornerShape(24.dp))
             .testTag("expert_card_${expert.id}")
     ) {
-        ExpertCoverPhoto(
-            expert = expert,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(84.dp)
-        )
-
         Column(modifier = Modifier.padding(16.dp)) {
-            // Profile top line
+            // Header: Avatar + Identity Info
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Photo represented as custom circle
                 Box(contentAlignment = Alignment.Center) {
                     AvatarImage(
                         name = expert.name,
-                        size = 52
+                        size = 56,
+                        category = expert.category
                     )
-                    // Online Indicator Dot
                     if (expert.isOnlineNow) {
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)
                                 .size(12.dp)
-                                .background(Color(0xFF5A8F76), CircleShape) // Sage Green online dot
+                                .background(Color(0xFF2ECC71), CircleShape)
                                 .border(BorderStroke(2.dp, Color.White), CircleShape)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(14.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = expert.name,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = MaterialTheme.colorScheme.onBackground
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 16.sp,
+                            color = Color.Black
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        
-                        // Emoji Area Identifier
                         Text(
                             text = expert.areaEmoji,
-                            fontSize = 15.sp,
-                            modifier = Modifier.testTag("expert_emoji_${expert.id}")
+                            fontSize = 16.sp
                         )
                     }
 
+                    Spacer(modifier = Modifier.height(2.dp))
+
                     Text(
                         text = expert.title,
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = "${expert.yearsOfExperience} Years Experience",
-                        fontSize = 11.sp,
-                        color = Color.Gray,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Bold
                     )
                 }
 
-                // Follow bookmark tag
+                // Follow Bookmark
                 IconButton(onClick = { onActionTriggered("Follow_Trigger") }) {
                     Icon(
                         imageVector = if (isFollowed) Icons.Filled.Star else Icons.Outlined.Star,
-                        contentDescription = "Followed star check",
-                        tint = if (isFollowed) Color(0xFFF1C40F) else Color.Gray.copy(alpha = 0.5f),
+                        contentDescription = "Follow status",
+                        tint = if (isFollowed) Color(0xFFF1C40F) else Color.LightGray,
                         modifier = Modifier.size(24.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Biography summary
-            Text(
-                text = expert.bio,
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.76f),
-                lineHeight = 16.sp
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Badges details (Rating, helped counter)
+            // Rating + Price + Session Duration Details
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    .padding(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Rating
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Star, "Rating Star", modifier = Modifier.size(16.dp), tint = Color(0xFFF1C40F))
+                    Icon(
+                        imageVector = Icons.Filled.Star,
+                        contentDescription = "RatingStar",
+                        modifier = Modifier.size(16.dp),
+                        tint = Color(0xFFF1C40F)
+                    )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = String.format(java.util.Locale.US, "%.2f", expert.rating),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
+                        text = String.format(java.util.Locale.US, "%.1f", expert.rating),
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 13.sp,
+                        color = Color.Black
                     )
                 }
 
-                // Help counting
-                Text(
-                    text = "❤️ Helped ${expert.peopleHelpedCount} Learners",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-
-                // Languages
-                Text(
-                    text = "💬 " + expert.languages.joinToString(", "),
-                    fontSize = 11.sp,
-                    color = Color.Gray,
-                    fontWeight = FontWeight.Medium
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "₹$rate / 30 mins",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-            Spacer(modifier = Modifier.height(12.dp))
 
-            // Action connect buttons bar (Book, Message, Voice, Video)
+            // Next Available slot
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFF4F6F9), RoundedCornerShape(12.dp))
+                    .padding(8.dp)
+            ) {
+                Text(
+                    text = "NEXT AVAILABLE SLOT",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.Gray,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = nextSlotString,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFE74C3C)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Buttons: Message + View Availability
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // View Profile button
                 OutlinedButton(
-                    onClick = onViewProfile,
-                    modifier = Modifier
-                        .weight(1.3f)
-                        .height(38.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-                    contentPadding = PaddingValues(0.dp)
-                ) {
-                    Text("View Profile", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
-
-                // Message Button
-                Button(
                     onClick = { onActionTriggered("Message") },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f), contentColor = MaterialTheme.colorScheme.primary),
                     modifier = Modifier
-                        .size(38.dp),
-                    shape = RoundedCornerShape(8.dp),
+                        .weight(1f)
+                        .height(44.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
                     contentPadding = PaddingValues(0.dp)
                 ) {
-                    Icon(Icons.Filled.Send, "Message expert button", modifier = Modifier.size(15.dp))
+                    Text("Message", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
 
-                // Book Button
                 Button(
                     onClick = { onActionTriggered("Book") },
                     modifier = Modifier
                         .weight(1.2f)
-                        .height(38.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(0.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        .height(44.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    contentPadding = PaddingValues(0.dp)
                 ) {
-                    Text("Book Session", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("View Availability", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
         }
@@ -9124,7 +9220,8 @@ fun WisdomProfileDetailView(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             AvatarImage(
                                 name = expert.name,
-                                size = 72
+                                size = 72,
+                                category = expert.category
                             )
                             Spacer(modifier = Modifier.width(14.dp))
                             Column {
@@ -10241,7 +10338,7 @@ fun MessagesScreen(
 
                     Spacer(modifier = Modifier.width(6.dp))
 
-                    AvatarImage(name = activeConv.recipientName, size = 42)
+                    AvatarImage(name = activeConv.recipientName, size = 42, avatarUrl = activeConv.recipientAvatar)
 
                     Spacer(modifier = Modifier.width(12.dp))
 
@@ -11006,7 +11103,7 @@ fun MessagesScreen(
                                     modifier = Modifier.padding(12.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    AvatarImage(name = conv.recipientName, size = 48)
+                                    AvatarImage(name = conv.recipientName, size = 48, avatarUrl = conv.recipientAvatar)
 
                                     Spacer(modifier = Modifier.width(14.dp))
 
@@ -11240,7 +11337,8 @@ fun ProfileAndLeaderScreen(
                             ProceduralLinkedInAvatar(
                                 name = user.name,
                                 sizeDp = 78,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize(),
+                                avatarUrl = user.avatarUrl
                             )
                         }
 
@@ -12718,7 +12816,9 @@ fun PremiumLinkedInMentorCard(
                         sizeDp = 60,
                         modifier = Modifier
                             .background(Color.White, CircleShape)
-                            .border(BorderStroke(2.5.dp, Color.White), CircleShape)
+                            .border(BorderStroke(2.5.dp, Color.White), CircleShape),
+                        category = expert.category,
+                        avatarUrl = expert.avatarUrl
                     )
                     // Online indicator
                     if (expert.isOnlineNow) {
@@ -13153,7 +13253,9 @@ fun CompactLinkedInMentorCard(
                         ProceduralLinkedInAvatar(
                             name = expert.name,
                             sizeDp = 56,
-                            modifier = Modifier.clip(CircleShape).background(Color.White)
+                            modifier = Modifier.clip(CircleShape).background(Color.White),
+                            category = expert.category,
+                            avatarUrl = expert.avatarUrl
                         )
                         // Small green dot if active now
                         if (expert.isOnlineNow) {
@@ -14570,7 +14672,7 @@ fun CategoryDetailScreen(
                                     isFollowed = followedIds.contains(expert.id),
                                     bookingTime = bookedSessions[expert.id],
                                     onBookSession = {
-                                        bookingExpertForSlotsDialog = expert
+                                        viewModel.openScheduler(expert.id)
                                     },
                                     onContactExpert = {
                                         viewModel.startDirectChat(expert.id, "Hello, I would like to establish personal guidance under your mentorship.")
@@ -14614,7 +14716,7 @@ fun CategoryDetailScreen(
                                     isFollowed = followedIds.contains(expert.id),
                                     bookingTime = bookedSessions[expert.id],
                                     onBookSession = {
-                                        bookingExpertForSlotsDialog = expert
+                                        viewModel.openScheduler(expert.id)
                                     },
                                     onContactExpert = {
                                         viewModel.startDirectChat(expert.id, "Hello, I would like to establish personal guidance under your mentorship.")
@@ -14961,7 +15063,9 @@ fun CategoryDetailScreen(
                                 ProceduralLinkedInAvatar(
                                     name = expert.name,
                                     sizeDp = 56,
-                                    modifier = Modifier.clip(CircleShape).background(Color.White)
+                                    category = expert.category,
+                                    modifier = Modifier.clip(CircleShape).background(Color.White),
+                                    avatarUrl = expert.avatarUrl
                                 )
                             }
                             Spacer(modifier = Modifier.width(12.dp))
@@ -15528,7 +15632,7 @@ fun DetailFeaturedExpertCard(
                         .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f), RoundedCornerShape(23.dp))
                         .padding(2.dp)
                 ) {
-                    AvatarImage(name = expert.name, modifier = Modifier.fillMaxSize())
+                    AvatarImage(name = expert.name, modifier = Modifier.fillMaxSize(), category = expert.category)
                 }
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
@@ -16540,6 +16644,338 @@ fun EventDetailScreen(
     }
 }
 
+enum class SlotState {
+    AVAILABLE,
+    BOOKED_BY_ME,
+    BOOKED_BY_OTHER
+}
+
+fun parseTimeToMinutes(timeStr: String): Int {
+    try {
+        val cleaned = timeStr.trim().uppercase(java.util.Locale.US)
+        val ampm = if (cleaned.contains("PM")) "PM" else "AM"
+        val hhmmPart = cleaned.replace("AM", "").replace("PM", "").trim()
+        val parts = hhmmPart.split(":")
+        if (parts.isEmpty()) return 0
+        var hour = parts[0].toIntOrNull() ?: 0
+        val minute = if (parts.size > 1) parts[1].toIntOrNull() ?: 0 else 0
+        
+        if (ampm == "PM" && hour < 12) {
+            hour += 12
+        } else if (ampm == "AM" && hour == 12) {
+            hour = 0
+        }
+        return hour * 60 + minute
+    } catch (e: Exception) {
+        return 0
+    }
+}
+
+@Composable
+fun SlotPill(
+    startTime: String,
+    state: SlotState,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val isBookedByOther = state == SlotState.BOOKED_BY_OTHER
+    val isBookedByMe = state == SlotState.BOOKED_BY_ME
+    val isBlocked = isBookedByOther || isBookedByMe
+    
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (isPressed && !isBlocked) 0.95f else 1f, label = "scale")
+
+    Box(
+        modifier = Modifier
+            .scale(scale)
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                color = when {
+                    isBookedByOther -> Color(0xFFE5E5EA) // Premium light grey (Apple-style) for booked by others
+                    isBookedByMe -> Color(0xFFE8E5FA)    // Soft lavender background for booked by current user!
+                    isSelected -> Color(0xFF6200EE)      // Primary purple if selected
+                    else -> Color.White                  // White slot for available!
+                }
+            )
+            .border(
+                width = 1.dp,
+                color = when {
+                    isBookedByOther -> Color.Transparent
+                    isBookedByMe -> Color(0xFF9575CD)    // Strong lavender border
+                    isSelected -> Color.Transparent
+                    else -> Color(0xFFE2DDF8)            // Very subtle lavender border for available white slots
+                },
+                shape = RoundedCornerShape(12.dp)
+            )
+            .then(
+                if (isBlocked) {
+                    Modifier
+                } else {
+                    Modifier.clickable(
+                        interactionSource = interactionSource,
+                        indication = androidx.compose.foundation.LocalIndication.current,
+                        onClick = onClick
+                    )
+                }
+            )
+            .padding(vertical = if (isBookedByOther || isBookedByMe) 8.dp else 12.dp, horizontal = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        when {
+            isBookedByOther -> {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = startTime,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF8E8E93),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Text(
+                        text = "BOOKED",
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color(0xFF8E8E93),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
+            isBookedByMe -> {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = startTime,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF6200EE),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Text(
+                        text = "YOUR SESSION",
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color(0xFF6200EE),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
+            else -> {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    if (isSelected) {
+                        Text(
+                            text = "✓ ",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
+                        )
+                    }
+                    Text(
+                        text = startTime,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isSelected) Color.White else Color(0xFF1C1C1E)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SessionDetailsDialog(
+    booking: Booking,
+    viewModel: AgeNoBarViewModel,
+    onDismiss: () -> Unit,
+    onReschedule: () -> Unit
+) {
+    var showCancelConfirm by remember { mutableStateOf(false) }
+
+    if (showCancelConfirm) {
+        AlertDialog(
+            onDismissRequest = { showCancelConfirm = false },
+            title = { Text("Cancel Appointment? 🚨", fontWeight = FontWeight.Bold, color = Color(0xFFC62828)) },
+            text = { Text("Are you absolutely sure you want to cancel your upcoming session with ${booking.expertName} on ${booking.timing}? This slot will be released back to other learners.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.cancelBooking(booking.id)
+                        showCancelConfirm = false
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828))
+                ) {
+                    Text("Yes, Cancel Session", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCancelConfirm = false }) {
+                    Text("Keep Appointment")
+                }
+            }
+        )
+    } else {
+        AlertDialog(
+            onDismissRequest = { onDismiss() },
+            title = {
+                Text("🗓️ Session Details", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Avatar and Name of Expert
+                    Box(
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                    ) {
+                        ProceduralLinkedInAvatar(
+                            name = booking.expertName,
+                            sizeDp = 72,
+                            avatarUrl = booking.expertAvatar
+                        )
+                    }
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = booking.expertName,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
+                        Text(
+                            text = "Wisdom Bridge Mentor",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.Gray
+                        )
+                    }
+
+                    // Booking info card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF9F9FB)),
+                        border = BorderStroke(1.dp, Color(0xFFECECEF)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("⏰ ", fontSize = 16.sp)
+                                Text(
+                                    text = "Scheduled Time: ",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.DarkGray
+                                )
+                                Text(
+                                    text = booking.timing,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(0xFF6200EE)
+                                )
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("⏱️ ", fontSize = 16.sp)
+                                Text(
+                                    text = "Duration: ",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.DarkGray
+                                )
+                                Text(
+                                    text = "${booking.durationMinutes} mins",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black
+                                )
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(if (booking.isVideo) "📹 " else "📞 ", fontSize = 16.sp)
+                                Text(
+                                    text = "Medium: ",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.DarkGray
+                                )
+                                Text(
+                                    text = if (booking.isVideo) "Video Call" else "Voice Call",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black
+                                )
+                            }
+                        }
+                    }
+
+                    // Actions
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Reschedule
+                        Button(
+                            onClick = {
+                                onDismiss()
+                                onReschedule()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6200EE)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("✏️ Reschedule Session", fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+
+                        // Message Expert
+                        OutlinedButton(
+                            onClick = {
+                                onDismiss()
+                                viewModel.startDirectChat(booking.expertId, navigateToTab = true)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            border = BorderStroke(1.dp, Color(0xFF6200EE)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("💬 Message Expert", fontWeight = FontWeight.Bold, color = Color(0xFF6200EE))
+                        }
+
+                        // Cancel Booking
+                        TextButton(
+                            onClick = { showCancelConfirm = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("🗑️ Cancel Booking", fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { onDismiss() }) {
+                    Text("Close", fontWeight = FontWeight.Medium)
+                }
+            }
+        )
+    }
+}
+
 @Composable
 fun PremiumBookingCalendarScreen(
     expertId: String,
@@ -16553,29 +16989,34 @@ fun PremiumBookingCalendarScreen(
     val currentUser by viewModel.currentUser.collectAsState()
     val isTeacherMode = currentUser.userRoleType == "Teach"
 
-    fun getEventsForDay(day: CalendarDay, allEvents: List<CommunityEvent>): List<CommunityEvent> {
-        return allEvents.filter { event ->
-            val timeString = event.localTime.lowercase()
-            val matchToday = day.isToday && (timeString.contains("today") || timeString.contains(day.fullName.lowercase()) || timeString.contains(day.key.lowercase()))
-            val matchDayName = timeString.contains(day.fullName.lowercase()) || timeString.contains(day.key.lowercase())
-            matchToday || matchDayName
-        }
+    // Always resolve a real expert (fallback if needed for common_calendar)
+    val targetExpert = remember(expertId, experts) {
+        experts.find { it.id == expertId } ?: experts.firstOrNull() ?: Expert(
+            id = "exp_seed_maths_1",
+            name = "Lakshmi Rao",
+            title = "Mathematics Mentor",
+            category = "LEARN & GROW",
+            yearsOfExperience = 15,
+            areaEmoji = "📐",
+            languages = listOf("English", "Kannada"),
+            rating = 4.8,
+            testimonialsCount = 14,
+            peopleHelpedCount = 42,
+            avatarUrl = ""
+        )
     }
-    
-    val expert = experts.find { it.id == expertId }
-    
-    // Apple Health style Day selection dataset dynamically computed
+
     val today = java.time.LocalDate.now()
     val currentMonday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
     val calendarDays = remember {
         (0..6).map { i ->
             val date = currentMonday.plusDays(i.toLong())
             val isDateToday = date.isEqual(today)
-            val shortName = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()) // "Mon", "Tue"
-            val fullName = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault())
+            val shortName = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US)
+            val fullName = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.US)
             val labelNum = date.dayOfMonth.toString()
             CalendarDay(
-                key = shortName.take(3),
+                key = shortName.take(3).uppercase(),
                 fullName = fullName,
                 labelNum = labelNum,
                 isToday = isDateToday,
@@ -16583,58 +17024,83 @@ fun PremiumBookingCalendarScreen(
             )
         }
     }
-    
+
     val initiallySelectedDay = remember {
-        today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()).uppercase().take(3)
+        today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US).uppercase().take(3)
     }
     var selectedDay by remember(initiallySelectedDay) { mutableStateOf(initiallySelectedDay) }
-    
-    // Large details-focused vertical slots list starting from 6:00 AM to 9:00 PM
-    val START_HOUR = 6
+    var selectedDuration by remember { mutableStateOf(30) } // 30, 45, 60 minutes option
+
+    val START_HOUR = 8
     val END_HOUR = 21
-    val standardSlots = remember {
-        (START_HOUR..END_HOUR).map { hour ->
+    val standardSlots = remember(selectedDuration) {
+        val list = mutableListOf<Pair<String, String>>()
+        var currentMinutes = START_HOUR * 60
+        val endMinutes = END_HOUR * 60
+        while (currentMinutes <= endMinutes) {
+            val hour = currentMinutes / 60
+            val minOfHour = currentMinutes % 60
             val ampm = if (hour < 12) "AM" else "PM"
             val h = if (hour % 12 == 0) 12 else hour % 12
-            val formattedHour = String.format("%02d:00 %s", h, ampm)
-            val endHour = hour + 1
-            val endAmpm = if (endHour < 12 || endHour == 24) "AM" else "PM"
-            val eh = if (endHour % 12 == 0) 12 else endHour % 12
-            val formattedEndHour = String.format("%02d:00 %s", eh, endAmpm)
-            Pair(formattedHour, formattedEndHour)
+            val formattedStart = String.format("%d:%02d %s", h, minOfHour, ampm)
+            
+            val endTotal = currentMinutes + selectedDuration
+            val eh = endTotal / 60
+            val em = endTotal % 60
+            val endAmpm = if (eh < 12 || eh >= 24) "AM" else "PM"
+            val formattedEh = if (eh % 12 == 0) 12 else eh % 12
+            val formattedEnd = String.format("%d:%02d %s", formattedEh, em, endAmpm)
+            
+            list.add(Pair(formattedStart, formattedEnd))
+            currentMinutes += 30
+        }
+        list
+    }
+
+    val baseRate = if (targetExpert.flatSessionFee > 0) targetExpert.flatSessionFee else 100
+    val calculatedPrice = remember(selectedDuration, baseRate) {
+        when (selectedDuration) {
+            45 -> (baseRate * 1.5).toInt()
+            60 -> baseRate * 2
+            else -> baseRate
         }
     }
-    
-    // Mapping of slot indexes to mock premium tutoring offerings for high-fidelity content
-    val tutoringOfferings = listOf(
-        Triple("📐 Mathematics & Algebra Refresher", "Master core equations, formula trees and real-world basic statistics.", "📐"),
-        Triple("✍️ Language Arts & Creative Writing", "Polishing grammar, descriptive vocabulary, and engaging composition.", "✍️"),
-        Triple("🌳 Nature, Life Sciences & Biology", "Exploring organic life, agricultural systems, and botany fundamentals.", "🌳"),
-        Triple("🧩 Logical Reasoning & Cognitive Drills", "Interactive brain teasers, diagnostic puzzles and problem solving.", "🧩"),
-        Triple("💻 Digital Literacy & Computing Basics", "Navigating online resources, smart communications and workspace tools.", "💻"),
-        Triple("🌟 Creative Arts & Calligraphy Lab", "Unlocking artistic expression, visual composition, and stroke styling.", "🌟")
-    )
 
     var alertMessage by remember { mutableStateOf<String?>(null) }
-    var showBookingConfirmationBySlot by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var showBookingConfirmationBySlot by remember { mutableStateOf<Pair<String, String>?>(null) } // targetExpertId, startTime
     var activeRescheduleBookingId by remember(rescheduleBookingId) { mutableStateOf(rescheduleBookingId) }
-    var blockedSlots by remember { mutableStateOf(setOf<String>()) } // Format: "WED • 10:00 AM - 10:30 AM"
     var bookingSuccessData by remember { mutableStateOf<BookingConfirmationData?>(null) }
-    var selectedExpertForProfileState by remember { mutableStateOf<Expert?>(null) }
+    var selectedSlot by remember { mutableStateOf<String?>(null) }
+
+    val isPersonalCalendar = expertId == "common_calendar"
+    val activeExpertSlots by viewModel.activeExpertSlots.collectAsState()
+    LaunchedEffect(expertId) {
+        if (expertId != "common_calendar") {
+            viewModel.loadSlotsForExpert(expertId)
+        }
+    }
+
+    var selectedBookingForDetails by remember { mutableStateOf<Booking?>(null) }
+    var selectedBookingForReschedule by remember { mutableStateOf<Booking?>(null) }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        PrimaryBackgroundWarmWhite,
-                        SecondarySurfaceSoftIvory
-                    )
-                )
-            )
+            .background(Color.White)
             .testTag("premium_scheduler_screen")
     ) {
+        val selectedDateText = remember(selectedDay, calendarDays) {
+            val activeDayObj = calendarDays.find { it.key == selectedDay } ?: calendarDays[0]
+            val shortDayName = activeDayObj.key.lowercase().capitalize(java.util.Locale.US)
+            val dateLabel = try {
+                val d = java.time.LocalDate.parse(activeDayObj.dateString)
+                d.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US)
+            } catch (e: Exception) {
+                "Jun"
+            }
+            "$shortDayName, ${activeDayObj.labelNum} $dateLabel"
+        }
+
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = Color.Transparent,
@@ -16647,88 +17113,151 @@ fun PremiumBookingCalendarScreen(
                 ) {
                     Spacer(modifier = Modifier.height(34.dp))
                     
-                    // Elegant minimal top bar heading
+                    // Top Bar: Back icon + Title
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(40.dp)
-                                .background(Color.White.copy(alpha = 0.8f), CircleShape)
-                                .border(1.dp, Color.White.copy(alpha = 0.9f), CircleShape)
+                                .size(36.dp)
+                                .background(Color(0xFFF1F5F9), CircleShape)
                                 .clickable { onBack() }
                                 .testTag("scheduler_back"),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.ArrowBack,
-                                contentDescription = "Back back button arrow",
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
                                 tint = Color.DarkGray,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                         
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.weight(1f))
                         
-                        Column {
-                            Text(
-                                text = if (rescheduleBookingId != null) "Reschedule Workspace" else if (expertId == "common_calendar") "Wisdom Class Calendar" else "Class Calendar",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.Black
-                            )
-                            Text(
-                                text = if (expertId == "common_calendar") "1:1 Classes & Live Workshops" else "1:1 Live Interactive Classrooms",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.Gray,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+                        Text(
+                            text = if (isPersonalCalendar) "My Schedule" else "Book Session",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
+                        
+                        Spacer(modifier = Modifier.weight(1f))
+                        Spacer(modifier = Modifier.width(36.dp)) // Mimic balance
                     }
 
-                    // Expert Details Mini-Card, Glassmorphic Floating Style
-                    if (expert != null) {
+                    if (isPersonalCalendar) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 6.dp)
-                                .background(Color.White.copy(alpha = 0.85f), RoundedCornerShape(20.dp))
-                                .border(BorderStroke(1.dp, Color.White), RoundedCornerShape(20.dp))
-                                .padding(12.dp),
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            ProceduralLinkedInAvatar(
-                                name = expert.name,
-                                sizeDp = 46,
+                            Box(
                                 modifier = Modifier
-                                    .background(Color.White, RoundedCornerShape(10.dp))
-                                    .clip(RoundedCornerShape(10.dp))
-                            )
+                                    .size(56.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFE8E4FD)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarMonth,
+                                    contentDescription = "Personal Schedule",
+                                    tint = Color(0xFF6200EE),
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+
                             Spacer(modifier = Modifier.width(12.dp))
+
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Instructor: ${expert.name}",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.ExtraBold,
+                                    text = "Personal Learning Schedule",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
                                     color = Color.Black
                                 )
                                 Text(
-                                    text = expert.title,
+                                    text = "All upcoming & past expert sessions",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Color.DarkGray,
+                                    color = Color.Gray,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    } else {
+                        // Compact Profile Row (Apple Health Style)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(CircleShape)
+                            ) {
+                                ProceduralLinkedInAvatar(
+                                    name = targetExpert.name,
+                                    sizeDp = 56,
+                                    category = targetExpert.category,
+                                    avatarUrl = targetExpert.avatarUrl
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = targetExpert.name,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black
+                                )
+                                Text(
+                                    text = targetExpert.title,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFF6200EE),
                                     fontWeight = FontWeight.Bold
                                 )
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(top = 2.dp)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "⭐ ${targetExpert.rating} (${targetExpert.testimonialsCount} reviews)",
+                                        fontSize = 11.sp,
+                                        color = Color.Gray,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+
+                            // Top right price card
+                            Card(
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFF6F3FE)),
+                                border = BorderStroke(1.dp, Color(0xFFE2DDF8)),
+                                modifier = Modifier.padding(start = 8.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    val formattedRating = String.format(java.util.Locale.US, "%.2f", expert.rating)
-                                    Text("⭐ $formattedRating Rating", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFFF39C12))
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Text("₹299 / 30 mins session", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                                    Text(
+                                        text = "₹$calculatedPrice",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF6200EE)
+                                    )
+                                    Text(
+                                        text = "$selectedDuration mins",
+                                        fontSize = 11.sp,
+                                        color = Color.Gray,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
                                 }
                             }
                         }
@@ -16741,360 +17270,619 @@ fun PremiumBookingCalendarScreen(
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                // Sticky Header Day Selector at top of screen body
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp)
-                        .background(Color.White.copy(alpha = 0.8f), RoundedCornerShape(24.dp))
-                        .border(1.dp, Color.White.copy(alpha = 0.6f), RoundedCornerShape(24.dp))
-                        .padding(8.dp)
-                ) {
-                    Column {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp).padding(bottom = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "June 2026",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color.Black
-                            )
-                            Text(
-                                text = "Choose Day",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.ExtraBold
-                            )
+                // Month Selector Group with arrows < June 2026 ▾ >
+                val currentMonthYearText = remember(selectedDay, calendarDays) {
+                    val activeDayObj = calendarDays.find { it.key == selectedDay } ?: calendarDays.firstOrNull()
+                    val dateStr = activeDayObj?.dateString ?: ""
+                    if (dateStr.isNotEmpty()) {
+                        try {
+                            val localDate = java.time.LocalDate.parse(dateStr)
+                            val monthName = localDate.month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.US)
+                            val yearValue = localDate.year
+                            "$monthName $yearValue"
+                        } catch (e: Exception) {
+                            "June 2026"
                         }
-
-                        WisdomBridgeHorizontalCalendar(
-                            selectedDayKey = selectedDay,
-                            daysList = calendarDays,
-                            bookingsList = bookingsList,
-                            onDaySelected = { day ->
-                                selectedDay = day.key.uppercase()
-                            }
-                        )
+                    } else {
+                        "June 2026"
                     }
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                Text(
-                    text = "Hourly Intake Timeline • $selectedDay",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.Black,
-                    modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp)
-                )
-
-                // Smooth Scrolling Timeline Agenda View
-                LazyColumn(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    items(standardSlots.size) { index ->
-                        val slotPair = standardSlots[index]
-                        val (startTime, endTime) = slotPair
-                        val slotTimeRange = "$startTime - $endTime"
-                        val timingString = "$selectedDay • $slotTimeRange"
-                        
-                        val matchingEvent = events.find { ev ->
-                            getEventsForDay(calendarDays.find { it.key.uppercase() == selectedDay } ?: calendarDays[0], listOf(ev)).isNotEmpty() &&
-                            (ev.localTime.contains(startTime, ignoreCase = true) || ev.localTime.contains(startTime.replace(" ", ""), ignoreCase = true))
-                        }
-                        
-                        val matchingBooking = bookingsList.find { b -> 
-                            val bTiming = b.timing.uppercase()
-                            val isSameDay = bTiming.startsWith(selectedDay) || bTiming.contains(selectedDay)
-                            val timePart = bTiming.substringAfter("•").trim()
-                            val isSameTime = timePart.contains(startTime) || startTime.contains(timePart) || 
-                                             timePart.replace(" ", "").contains(startTime.replace(" ", "")) ||
-                                             startTime.replace(" ", "").contains(timePart.replace(" ", ""))
-                            val matchesExpert = (expertId == "common_calendar") || (b.expertId == expertId)
-                            isSameDay && isSameTime && matchesExpert
-                        }
-                        
-                        val isBookedByYou = (matchingBooking != null && (matchingBooking.status == "Upcoming" || matchingBooking.status == "confirmed" || matchingBooking.status == "Joined")) || (matchingEvent != null && matchingEvent.isUserRsvped)
-                        val isBookedByPeer = !isBookedByYou && (index == 1 || index == 3) && expertId != "common_calendar"
-                        val isBlockedSlot = blockedSlots.contains(timingString) && expertId != "common_calendar"
-                        
-                        val classDetails = tutoringOfferings[index % tutoringOfferings.size]
-                        val (initialClassName, initialClassDesc, initialClassIcon) = classDetails
+                    IconButton(
+                        onClick = {
+                            // Quick navigate selection back by shifting days index
+                            val currentIndex = calendarDays.indexOfFirst { it.key == selectedDay }
+                            if (currentIndex > 0) {
+                                selectedDay = calendarDays[currentIndex - 1].key.uppercase()
+                                selectedSlot = null
+                            }
+                        },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Prev", tint = Color.DarkGray)
+                    }
 
-                        val slotExpertId = when (index % 6) {
-                            0 -> "exp_seed_maths_1"
-                            1 -> "exp_seed_languages_0"
-                            2 -> "exp_seed_gardening_0"
-                            3 -> "exp_seed_science_1"
-                            4 -> "exp_seed_finance_1"
-                            else -> "exp_seed_music_0"
-                        }
-                        val slotCategoryExpert = experts.find { it.id == slotExpertId }
-                        
-                        val className = when {
-                            matchingEvent != null -> matchingEvent.title
-                            matchingBooking != null -> "${matchingBooking.expertName}'s 1:1 Session"
-                            else -> initialClassName
-                        }
-                        val classDesc = when {
-                            matchingEvent != null -> matchingEvent.description
-                            matchingBooking != null -> "Personal 1:1 session with tutor ${matchingBooking.expertName} in ${matchingBooking.expertName}'s primary expertise area."
-                            else -> initialClassDesc
-                        }
-                        val classIcon = when {
-                            matchingEvent != null -> "🎉"
-                            matchingBooking != null -> "👨‍🏫"
-                            else -> initialClassIcon
-                        }
+                    Spacer(modifier = Modifier.width(8.dp))
 
-                        Row(
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { /* Toggle month picker */ }
+                    ) {
+                        Text(
+                            text = currentMonthYearText,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = "Dropdown",
+                            tint = Color.DarkGray,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    IconButton(
+                        onClick = {
+                            val currentIndex = calendarDays.indexOfFirst { it.key == selectedDay }
+                            if (currentIndex != -1 && currentIndex < calendarDays.size - 1) {
+                                selectedDay = calendarDays[currentIndex + 1].key.uppercase()
+                                selectedSlot = null
+                            }
+                        },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(Icons.Default.KeyboardArrowRight, contentDescription = "Next", tint = Color.DarkGray)
+                    }
+                }
+
+                // Month week strip
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 2.dp)
+                ) {
+                    BookingCalendar(
+                        selectedDayKey = selectedDay,
+                        daysList = calendarDays,
+                        bookingsList = bookingsList,
+                        onDaySelected = { day ->
+                            selectedDay = day.key.uppercase()
+                            selectedSlot = null 
+                        }
+                    )
+                }
+
+                if (isPersonalCalendar) {
+                    val selectedDayBookings = bookingsList.filter { b ->
+                        if (b.status == "cancelled") return@filter false
+                        val bTiming = b.timing.uppercase()
+                        bTiming.contains(selectedDay) || 
+                          (selectedDay == today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US).uppercase().take(3) && bTiming.contains("TODAY"))
+                    }
+
+                    var showAllHistory by remember { mutableStateOf(false) }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (showAllHistory) "All Sessions History 📚" else "Sessions for $selectedDateText",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.Black,
+                            modifier = Modifier.testTag("personal_calendar_heading")
+                        )
+
+                        Text(
+                            text = if (showAllHistory) "Show Selected Day" else "View All History",
+                            fontSize = 12.sp,
+                            color = Color(0xFF6200EE),
+                            fontWeight = FontWeight.Bold,
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("slot_row_$index"),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            // Timeline clock section on the left
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier
-                                    .width(66.dp)
-                                    .padding(top = 10.dp)
-                            ) {
-                                Text(
-                                    text = startTime,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = Color.Black
-                                )
-                                Text(
-                                    text = "30 min",
-                                    fontSize = 10.sp,
-                                    color = Color.Gray,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                
-                                Spacer(modifier = Modifier.height(10.dp))
-                                
-                                // Elegant vertical dashed connector line
+                                .clickable { showAllHistory = !showAllHistory }
+                                .testTag("toggle_history_button")
+                        )
+                    }
+
+                    val activeList = if (showAllHistory) {
+                        bookingsList.filter { it.status != "cancelled" }
+                    } else {
+                        selectedDayBookings
+                    }
+                    val sortedActiveList = remember(activeList, calendarDays) {
+                        sortBookingsChronologically(activeList, calendarDays)
+                    }
+
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 40.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        if (sortedActiveList.isEmpty()) {
+                            item {
                                 Box(
                                     modifier = Modifier
-                                        .width(2.dp)
-                                        .height(98.dp)
-                                        .background(
-                                            brush = Brush.verticalGradient(
-                                                colors = listOf(
-                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                                                    Color.Transparent
-                                                )
-                                            )
-                                        )
-                                )
-                            }
-
-                            // Large beautifully styled custom status card on the right
-                            if (isBookedByYou) {
-                                // BOOKED card (blue/purple tint background, with Reschedule & Join buttons)
-                                Card(
-                                    shape = RoundedCornerShape(24.dp),
-                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFECE5FD)), // Elegant modern blue/purple tint background
-                                    border = BorderStroke(1.dp, Color(0xFFD1C4E9)),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .testTag("booked_slot_card_$index")
+                                        .fillMaxWidth()
+                                        .padding(vertical = 40.dp),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Column(
-                                        modifier = Modifier.padding(16.dp)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                ProceduralLinkedInAvatar(
-                                                    name = matchingBooking?.expertName ?: (expert?.name ?: "Mentor"),
-                                                    sizeDp = 24,
-                                                    modifier = Modifier.clip(CircleShape)
-                                                )
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text(
-                                                    text = "Hosted by ${matchingBooking?.expertName ?: (expert?.name ?: "Mentor")}",
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.DarkGray
-                                                )
-                                            }
-                                            
-                                            // Status Badge
-                                            Box(
-                                                modifier = Modifier
-                                                    .background(Color(0xFFE8F5E9), RoundedCornerShape(8.dp))
-                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                                            ) {
-                                                Text(
-                                                    text = "✅ Appointed",
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.ExtraBold,
-                                                    color = Color(0xFF2E7D32)
-                                                )
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(10.dp))
-
-                                        // Subject Title
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text("📅", fontSize = 48.sp)
+                                        Spacer(modifier = Modifier.height(8.dp))
                                         Text(
-                                            text = className,
+                                            text = if (showAllHistory) "No session bookings found." else "No sessions scheduled for $selectedDateText",
                                             fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color.Black
+                                            color = Color.Gray,
+                                            fontWeight = FontWeight.Medium,
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                         )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        
-                                        // Context Description
-                                        Text(
-                                            text = classDesc,
-                                            fontSize = 11.sp,
-                                            color = Color.DarkGray,
-                                            lineHeight = 15.sp
-                                        )
-
-                                        Spacer(modifier = Modifier.height(12.dp))
-
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                            modifier = Modifier.fillMaxWidth()
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Button(
+                                            onClick = { onBack() },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6200EE)),
+                                            shape = RoundedCornerShape(10.dp),
+                                            modifier = Modifier.testTag("book_new_session_empty_state")
                                         ) {
-                                            val isJoinedState = matchingBooking?.status == "Joined"
-                                            Button(
-                                                onClick = { 
-                                                    if (matchingBooking != null) {
-                                                        viewModel.joinBooking(matchingBooking.id)
-                                                    }
-                                                    alertMessage = "Joined classes successfully! Ready to learn."
-                                                },
-                                                shape = RoundedCornerShape(12.dp),
-                                                colors = ButtonDefaults.buttonColors(
-                                                    containerColor = if (isJoinedState) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary
-                                                ),
-                                                modifier = Modifier
-                                                    .weight(1.2f)
-                                                    .height(44.dp)
-                                                    .testTag("enter_class_button_$index")
-                                            ) {
-                                                Text(if (isJoinedState) "Joined ✓" else "Enter Class 🎓", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                            }
-                                            
-                                            OutlinedButton(
-                                                onClick = {
-                                                    if (matchingBooking != null) {
-                                                        activeRescheduleBookingId = matchingBooking.id
-                                                        viewModel.setEditingBooking(matchingBooking)
-                                                    }
-                                                },
-                                                shape = RoundedCornerShape(12.dp),
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .height(44.dp)
-                                                    .testTag("reschedule_button_$index")
-                                            ) {
-                                                Text("Reschedule", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                            }
+                                            Text("Book a New Session", fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }
-                            } else {
-                                // AVAILABLE slot card (white background, green available indicator, Book this slot button)
+                            }
+                        } else {
+                            items(sortedActiveList.size) { index ->
+                                val booking = sortedActiveList[index]
                                 Card(
-                                    shape = RoundedCornerShape(24.dp),
-                                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                                    border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
                                     modifier = Modifier
-                                        .weight(1f)
-                                        .testTag("available_slot_card_$index")
+                                        .fillMaxWidth()
+                                        .clickable { selectedBookingForDetails = booking }
+                                        .testTag("booking_schedule_card_${booking.id}"),
+                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFBFBFF)),
+                                    border = BorderStroke(1.dp, Color(0xFFE2DDF8)),
+                                    shape = RoundedCornerShape(16.dp)
                                 ) {
-                                    Column(
-                                        modifier = Modifier.padding(16.dp)
+                                    Row(
+                                        modifier = Modifier.padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
+                                        Box(
+                                            modifier = Modifier
+                                                .size(52.dp)
+                                                .clip(CircleShape)
                                         ) {
+                                            ProceduralLinkedInAvatar(
+                                                name = booking.expertName,
+                                                sizeDp = 52,
+                                                avatarUrl = booking.expertAvatar
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.width(12.dp))
+
+                                        Column(modifier = Modifier.weight(1f)) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(6.dp)
-                                                        .background(Color(0xFF2ECC71), CircleShape)
-                                                )
-                                                Spacer(modifier = Modifier.width(6.dp))
                                                 Text(
-                                                    text = "Available",
-                                                    style = MaterialTheme.typography.labelSmall,
+                                                    text = "🧘",
+                                                    fontSize = 16.sp
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = booking.expertName,
+                                                    fontSize = 14.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFF27AE60)
+                                                    color = Color.Black
                                                 )
                                             }
                                             Text(
-                                                text = "30 min",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Bold,
+                                                text = "Wisdom Bridge Session",
+                                                fontSize = 12.sp,
                                                 color = Color.Gray
                                             )
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    imageVector = Icons.Default.AccessTime,
+                                                    contentDescription = "Time",
+                                                    tint = Color(0xFF6200EE),
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = booking.timing,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFF6200EE)
+                                                )
+                                            }
                                         }
 
-                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
 
-                                        // Subject icon and name
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(classIcon, fontSize = 20.sp)
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = className,
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color.Black
-                                            )
-                                        }
-
-                                        Spacer(modifier = Modifier.height(12.dp))
-
-                                        Button(
-                                            onClick = {
-                                                val bookingTargetExpertId = if (expertId == "common_calendar") {
-                                                    slotCategoryExpert?.id ?: "exp_seed_maths_1"
-                                                } else {
-                                                    expertId
-                                                }
-                                                showBookingConfirmationBySlot = Pair(bookingTargetExpertId, timingString)
-                                            },
-                                            shape = RoundedCornerShape(12.dp),
-                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                        Box(
                                             modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(44.dp)
-                                                .testTag("book_this_slot_button_$index")
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(
+                                                    when (booking.status.uppercase()) {
+                                                        "UPCOMING" -> Color(0xFFE8F5E9)
+                                                        "PAST", "COMPLETED" -> Color(0xFFF1F1F4)
+                                                        else -> Color(0xFFE8F5E9)
+                                                    }
+                                                )
+                                                .padding(horizontal = 8.dp, vertical = 4.dp)
                                         ) {
-                                            Text("Book this slot →", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            Text(
+                                                text = booking.status,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = when (booking.status.uppercase()) {
+                                                    "UPCOMING" -> Color(0xFF2E7D32)
+                                                    "PAST", "COMPLETED" -> Color.Gray
+                                                    else -> Color(0xFF2E7D32)
+                                                }
+                                            )
                                         }
                                     }
                                 }
+                            }
+                        }
+                    }
+                } else {
+                    // Inline Duration Options right below Date strip
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Session Length",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Gray
+                        )
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf(30, 45, 60).forEach { minutes ->
+                                val isSelected = selectedDuration == minutes
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isSelected) Color(0xFF6200EE) else Color(0xFFF1F5F9))
+                                        .clickable { 
+                                            selectedDuration = minutes 
+                                            selectedSlot = null 
+                                        }
+                                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "$minutes min",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) Color.White else Color.DarkGray
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Heading available times group
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = selectedDateText,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.Black
+                        )
+
+                        Icon(
+                            imageVector = Icons.Default.FilterList,
+                            contentDescription = "Filter slots",
+                            tint = Color.Gray,
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clickable { }
+                        )
+                    }
+
+                    // Filter slots by category dynamically
+                    val morningSlots = standardSlots.filter { slotPair ->
+                        val startTime = slotPair.first
+                        val isPm = startTime.contains("PM", ignoreCase = true)
+                        val hourVal = startTime.substringBefore(":").toIntOrNull() ?: 12
+                        !isPm || (hourVal == 12 && startTime.startsWith("12:00 Am"))
+                    }
+
+                    val afternoonSlots = standardSlots.filter { slotPair ->
+                        val startTime = slotPair.first
+                        val isPm = startTime.contains("PM", ignoreCase = true)
+                        val hourVal = startTime.substringBefore(":").toIntOrNull() ?: 12
+                        isPm && (hourVal == 12 || hourVal in 1..4)
+                    }
+
+                    val eveningSlots = standardSlots.filter { slotPair ->
+                        val startTime = slotPair.first
+                        val isPm = startTime.contains("PM", ignoreCase = true)
+                        val hourVal = startTime.substringBefore(":").toIntOrNull() ?: 12
+                        isPm && hourVal >= 5 && hourVal != 12
+                    }
+
+                    @Composable
+                    fun SlotGrid(slots: List<Pair<String, String>>) {
+                        val chunked = slots.chunked(4)
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            chunked.forEach { rowSlots ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    rowSlots.forEach { slotPair ->
+                                        val startTime = slotPair.first
+                                        
+                                        val slotStartMin = parseTimeToMinutes(startTime)
+                                        val slotEndMin = slotStartMin + selectedDuration
+
+                                        // Let's check if there is an overlapping booked session
+                                        val blockingBooking = bookingsList.find { b ->
+                                            if (b.status == "cancelled") return@find false
+                                            val bTiming = b.timing.uppercase()
+                                            val isSameDay = bTiming.contains(selectedDay) || 
+                                              (selectedDay == today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US).uppercase().take(3) && bTiming.contains("TODAY"))
+                                            if (!isSameDay) return@find false
+
+                                            val parsedDayAndTime = parseBookingDayAndTime(b, calendarDays) ?: return@find false
+                                            val bStartMin = parsedDayAndTime.second
+                                            val bEndMin = bStartMin + b.durationMinutes
+
+                                            // If there is ANY overlap between [slotStartMin, slotEndMin) and [bStartMin, bEndMin)
+                                            val overlap = slotStartMin < bEndMin && bStartMin < slotEndMin
+                                            
+                                            // Blocks availability if it is for this specific expert OR matches any booking
+                                            overlap
+                                        }
+
+                                        val slotState = when {
+                                            blockingBooking != null -> {
+                                                if (blockingBooking.expertId == targetExpert.id) {
+                                                     SlotState.BOOKED_BY_OTHER
+                                                } else {
+                                                     SlotState.BOOKED_BY_ME
+                                                }
+                                            }
+                                            else -> SlotState.AVAILABLE
+                                        }
+                                        val isSelected = selectedSlot == startTime
+
+                                        Box(
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            SlotPill(
+                                                startTime = startTime,
+                                                state = slotState,
+                                                isSelected = isSelected,
+                                                onClick = {
+                                                    selectedSlot = startTime
+                                                }
+                                            )
+                                        }
+                                    }
+                                    if (rowSlots.size < 4) {
+                                        repeat(4 - rowSlots.size) {
+                                            Spacer(modifier = Modifier.weight(1f))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 140.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        if (morningSlots.isNotEmpty()) {
+                            item {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                ) {
+                                    Text("☀️", fontSize = 14.sp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Morning",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Gray
+                                    )
+                                }
+                                SlotGrid(morningSlots)
+                            }
+                        }
+
+                        if (afternoonSlots.isNotEmpty()) {
+                            item {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                ) {
+                                    Text("🌤️", fontSize = 14.sp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Afternoon",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Gray
+                                    )
+                                }
+                                SlotGrid(afternoonSlots)
+                            }
+                        }
+
+                        if (eveningSlots.isNotEmpty()) {
+                            item {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                ) {
+                                    Text("🌙", fontSize = 14.sp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Evening",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Gray
+                                    )
+                                }
+                                SlotGrid(eveningSlots)
                             }
                         }
                     }
                 }
             }
         }
-    }
+
+        // Apple Health styled Sticky Footer Card with button on white elevated sheet
+        if (!isPersonalCalendar) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .testTag("sticky_booking_footer"),
+                color = Color.White,
+                tonalElevation = 6.dp,
+                shadowElevation = 12.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    // Info Badge card representing selected slot
+                    val isSlotActive = selectedSlot != null
+                    Card(
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isSlotActive) Color(0xFFF6F3FE) else Color(0xFFF1F5F9)
+                        ),
+                        border = BorderStroke(1.dp, if (isSlotActive) Color(0xFFE2DDF8) else Color(0xFFE2E8F0)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .background(
+                                        if (isSlotActive) Color(0xFFE8E4FD) else Color(0xFFE2E8F0),
+                                        RoundedCornerShape(10.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarMonth,
+                                    contentDescription = "Booking status icon",
+                                    tint = if (isSlotActive) Color(0xFF6200EE) else Color.Gray,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isSlotActive) "$selectedDateText • $selectedSlot" else "Select a timeslot",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black
+                                )
+                                Text(
+                                    text = "$selectedDuration mins session",
+                                    fontSize = 11.sp,
+                                    color = Color.Gray,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            Text(
+                                text = "₹$calculatedPrice",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSlotActive) Color(0xFF6200EE) else Color.Gray
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Full Booking CTA Button
+                    Button(
+                        onClick = {
+                            if (selectedSlot != null) {
+                                showBookingConfirmationBySlot = Pair(targetExpert.id, selectedSlot!!)
+                            }
+                        },
+                        enabled = selectedSlot != null,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF6200EE),
+                            disabledContainerColor = Color.LightGray.copy(alpha = 0.5f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("sticky_booking_confirm_button")
+                    ) {
+                        Text(
+                            text = "Book Session",
+                            fontWeight = FontWeight.Bold,
+                            color = if (selectedSlot != null) Color.White else Color.Gray,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
+        }
+
 
     if (alertMessage != null) {
         val msg = alertMessage!!
@@ -17121,40 +17909,75 @@ fun PremiumBookingCalendarScreen(
     }
 
     if (showBookingConfirmationBySlot != null) {
-        val (targetExpertId, timing) = showBookingConfirmationBySlot!!
-        val targetExpert = experts.find { it.id == targetExpertId } ?: expert
+        val (targetExpertId, startTime) = showBookingConfirmationBySlot!!
+        val slotTimeRange = "$startTime - ${startTime.substringBefore(":")}:${(startTime.substringAfter(":").substringBefore(" ").toInt() + selectedDuration).let { if (it >= 60) "00" else it.toString() }} ${startTime.substringAfter(" ")}"
+        val timingString = "$selectedDay • $startTime - $startTime" // Keep clean
+        val timingLabel = "$selectedDay • $startTime (${selectedDuration} mins)"
+        
         AlertDialog(
             onDismissRequest = { showBookingConfirmationBySlot = null },
-            title = { Text("Confirm Appointment Session 🤝", fontWeight = FontWeight.Bold) },
-            text = { Text("Would you like to finalize booking a 1:1 Live Lesson with ${targetExpert?.name ?: "Mentor"} on $timing? Chachi will register the slot instantly.") },
+            title = { Text("Confirm Slot Booking 🤝", fontWeight = FontWeight.Bold) },
+            text = { 
+                Text("Would you like to finalize booking a 1:1 consultation session with ${targetExpert.name}?\n\nDetails:\n• Date: $selectedDay\n• Time: $startTime\n• Duration: $selectedDuration mins\n• Final Prorated Price: ₹$calculatedPrice\n\nAI Chachi will instantly lock this slot and update your learning calendar.") 
+            },
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.bookSessionWithExpert(targetExpertId, timing, isVideo = true, onComplete = {
-                            bookingSuccessData = BookingConfirmationData(
-                                expertName = targetExpert?.name ?: "Mentor",
-                                title = targetExpert?.title ?: "Expert Guide",
-                                timing = timing,
-                                category = targetExpert?.category ?: "LEARN & GROW",
-                                emoji = when (targetExpert?.category?.uppercase()) {
-                                    "LEARN & GROW" -> "📚"
-                                    "HEALTH & WELLNESS" -> "🌿"
-                                    "ARTS, MUSIC & CULTURE" -> "🎨"
-                                    "NATURE & LIFESTYLE" -> "🌱"
-                                    else -> "📚"
-                                },
-                                isReschedule = false
-                            )
-                        })
+                        val requestedStart = parseTimeToMinutes(startTime)
+                        val requestedEnd = requestedStart + selectedDuration
+                        
+                        val overlappingBooking = bookingsList.find { b ->
+                            if (b.status == "cancelled") return@find false
+                            val bTiming = b.timing.uppercase()
+                            val isSameDay = bTiming.contains(selectedDay) || 
+                              (selectedDay == today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US).uppercase().take(3) && bTiming.contains("TODAY"))
+                            if (!isSameDay) return@find false
+
+                            val parsedDayAndTime = parseBookingDayAndTime(b, calendarDays) ?: return@find false
+                            val bStartMin = parsedDayAndTime.second
+                            val bEndMin = bStartMin + b.durationMinutes
+
+                            val overlap = requestedStart < bEndMin && bStartMin < requestedEnd
+                            overlap
+                        }
+                        
+                        if (overlappingBooking != null) {
+                            alertMessage = "You already have another session scheduled during this time."
+                            showBookingConfirmationBySlot = null
+                            return@Button
+                        }
+
+                        viewModel.bookSessionWithExpert(
+                            expertId = targetExpertId,
+                            selectedTime = "$selectedDay • $startTime", // Use clean format
+                            durationMinutes = selectedDuration,
+                            isVideo = true,
+                            onComplete = {
+                                bookingSuccessData = BookingConfirmationData(
+                                    expertName = targetExpert.name,
+                                    title = targetExpert.title,
+                                    timing = "$selectedDay • $startTime (${selectedDuration} mins)",
+                                    category = targetExpert.category,
+                                    emoji = when (targetExpert.category.uppercase()) {
+                                        "LEARN & GROW" -> "📚"
+                                        "HEALTH & WELLNESS" -> "🌿"
+                                        "ARTS, MUSIC & CULTURE" -> "🎨"
+                                        "NATURE & LIFESTYLE" -> "🌱"
+                                        else -> "📚"
+                                    },
+                                    isReschedule = false
+                                )
+                            }
+                        )
                         showBookingConfirmationBySlot = null
                     }
                 ) {
-                    Text("Confirm Booking & Close", fontWeight = FontWeight.Bold)
+                    Text("Confirm Booking & Complete", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showBookingConfirmationBySlot = null }) {
-                    Text("Back", fontWeight = FontWeight.Bold)
+                    Text("Cancel", fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -17189,7 +18012,7 @@ fun PremiumBookingCalendarScreen(
                 Spacer(modifier = Modifier.height(18.dp))
 
                 Text(
-                    text = if (successData.isReschedule) "Session Rescheduled Successfully" else "Session Booked Successfully",
+                    text = "Session Booked Successfully",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF2E7D32)
@@ -17254,6 +18077,7 @@ fun PremiumBookingCalendarScreen(
                     Button(
                         onClick = {
                             bookingSuccessData = null
+                            viewModel.openScheduler("common_calendar")
                         },
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B1A1A)),
@@ -17270,13 +18094,9 @@ fun PremiumBookingCalendarScreen(
                             bookingSuccessData = null
                             viewModel.closeScheduler()
                             val dayAndMonth = successData.timing.substringBefore(" • ").trim()
-                            val timePart = successData.timing.substringAfter(" • ").trim().substringBefore(" - ").trim()
+                            val timePart = successData.timing.substringAfter(" • ").trim().substringBefore(" (").trim()
                             
-                            val starterMsg = if (successData.isReschedule) {
-                                "Hello ${successData.expertName}, I have rescheduled our session to $dayAndMonth at $timePart. Looking forward to meeting you."
-                            } else {
-                                "Hello ${successData.expertName}, I have booked a session with you on $dayAndMonth at $timePart. Looking forward to meeting you."
-                            }
+                            val starterMsg = "Hello ${successData.expertName}, I have booked a session with you on $dayAndMonth at $timePart (Duration: $selectedDuration mins). Looking forward to speaking with you!"
                             viewModel.startDirectChat(expertId, starterMsg)
                         },
                         shape = RoundedCornerShape(14.dp),
@@ -17306,37 +18126,11 @@ fun PremiumBookingCalendarScreen(
                 }
             }
         }
-
-        selectedExpertForProfileState?.let { expert ->
-            val followedExportIds by viewModel.followedExpertIds.collectAsState()
-            val isFollowed = followedExportIds.contains(expert.id)
-            val bookedSecondsFlow = viewModel.bookedSessionExpertIds.collectAsState()
-            val isBooked = bookedSecondsFlow.value.contains(expert.id)
-
-            WisdomProfileDetailView(
-                expert = expert,
-                isFollowed = isFollowed,
-                bookedTime = if (isBooked) "Booked!" else null,
-                privateQuestionsCount = 0,
-                onClose = { selectedExpertForProfileState = null },
-                onActionType = { type ->
-                    if (type == "Follow_Trigger") {
-                        viewModel.toggleFollowExpert(expert.id)
-                    } else if (type == "Book") {
-                        viewModel.openScheduler(expert.id)
-                        selectedExpertForProfileState = null
-                    } else {
-                        viewModel.startDirectChat(expert.id)
-                        selectedExpertForProfileState = null
-                    }
-                },
-                onFollowToggle = { viewModel.toggleFollowExpert(expert.id) }
-            )
-        }
+    }
 
         activeRescheduleBookingId?.let { bookingId ->
             val bookingToReschedule = bookingsList.find { it.id == bookingId }
-            val rescheduleExpert = experts.find { it.id == bookingToReschedule?.expertId } ?: expert
+            val rescheduleExpert = experts.find { it.id == bookingToReschedule?.expertId } ?: targetExpert
 
             var rescheduleSelectedDay by remember(bookingId) { mutableStateOf(selectedDay) }
             var rescheduleSelectedSlot by remember(bookingId) { mutableStateOf("10:00 AM") }
@@ -17392,7 +18186,9 @@ fun PremiumBookingCalendarScreen(
                                 ProceduralLinkedInAvatar(
                                     name = rescheduleExpert?.name ?: "Mentor",
                                     sizeDp = 56,
-                                    modifier = Modifier.clip(CircleShape).background(Color.White)
+                                    category = rescheduleExpert?.category,
+                                    modifier = Modifier.clip(CircleShape).background(Color.White),
+                                    avatarUrl = rescheduleExpert?.avatarUrl
                                 )
                             }
                             Spacer(modifier = Modifier.width(12.dp))
@@ -17427,62 +18223,28 @@ fun PremiumBookingCalendarScreen(
                         HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
                         Spacer(modifier = Modifier.height(14.dp))
 
-                        // Full month grid (next 28 days in rows of 7 columns)
+                        // Select New Date Horizontal Week Strip
                         Text(
-                            text = "Select New Date • Calendar Month Grid",
+                            text = "Select New Date",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.Black,
                             modifier = Modifier.padding(bottom = 10.dp)
                         )
 
-                        val todayDate = remember { java.time.LocalDate.now() }
-                        val days28 = remember {
-                            (0..27).map { todayDate.plusDays(it.toLong()) }
-                        }
-                        val weeks = days28.chunked(7)
+                        WisdomBridgeHorizontalCalendar(
+                            selectedDayKey = rescheduleSelectedDay,
+                            daysList = calendarDays,
+                            bookingsList = bookingsList,
+                            onDaySelected = { day ->
+                                rescheduleSelectedDay = day.key.uppercase()
+                            },
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
 
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            weeks.forEach { week ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    week.forEach { date ->
-                                        val dayOfWeekShort = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()).uppercase().take(3)
-                                        val isSelected = rescheduleSelectedDay == dayOfWeekShort
-                                        
-                                        Box(
-                                            modifier = Modifier
-                                                .size(width = 44.dp, height = 48.dp)
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .background(if (isSelected) Color(0xFFECE5FD) else Color.Transparent)
-                                                .clickable { rescheduleSelectedDay = dayOfWeekShort }
-                                                .padding(4.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Text(dayOfWeekShort.take(1), fontSize = 9.sp, color = if (isSelected) Color(0xFF6200EE) else Color.Gray, fontWeight = FontWeight.Bold)
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                                Text(
-                                                    text = date.dayOfMonth.toString(),
-                                                    fontSize = if (isSelected) 14.sp else 12.sp,
-                                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
-                                                    color = if (isSelected) Color(0xFF6200EE) else Color.DarkGray
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        Spacer(modifier = Modifier.height(14.dp))
 
-                        Spacer(modifier = Modifier.height(18.dp))
-
-                        // Hour slots as green/grey chips
+                        // Hour slots as SlotPills
                         Text(
                             text = "Select New Available Hour",
                             fontSize = 13.sp,
@@ -17491,42 +18253,82 @@ fun PremiumBookingCalendarScreen(
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
 
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                            contentPadding = PaddingValues(vertical = 4.dp)
+                        // Render reschedule slots using the beautiful SlotPill grid
+                        val chunkedSlots = standardSlots.chunked(3)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 220.dp)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(standardSlots.size) { slotIdx ->
-                                val slotPair = standardSlots[slotIdx]
-                                val startTime = slotPair.first
-                                val isSelectedSlot = rescheduleSelectedSlot == startTime
-
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .background(if (isSelectedSlot) Color(0xFF2ECC71) else Color(0xFFF1F5F9))
-                                        .clickable { rescheduleSelectedSlot = startTime }
-                                        .padding(horizontal = 14.dp, vertical = 8.dp)
-                                        .testTag("reschedule_chip_$slotIdx")
+                            chunkedSlots.forEach { rowSlots ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text(
-                                        text = startTime,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isSelectedSlot) Color.White else Color.DarkGray
-                                    )
+                                    rowSlots.forEach { slotPair ->
+                                        val startTime = slotPair.first
+                                        val isSelectedSlot = rescheduleSelectedSlot == startTime
+                                        val isBooked = bookingsList.any { b ->
+                                            val bTiming = b.timing.uppercase()
+                                            bTiming.contains(rescheduleSelectedDay) && bTiming.contains(startTime) && b.expertId == rescheduleExpert.id
+                                        }
+
+                                        val slotState = if (isBooked) SlotState.BOOKED_BY_OTHER else SlotState.AVAILABLE
+
+                                        Box(
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            SlotPill(
+                                                startTime = startTime,
+                                                state = slotState,
+                                                isSelected = isSelectedSlot,
+                                                onClick = { rescheduleSelectedSlot = startTime }
+                                            )
+                                        }
+                                    }
+                                    if (rowSlots.size < 3) {
+                                        repeat(3 - rowSlots.size) {
+                                            Spacer(modifier = Modifier.weight(1f))
+                                        }
+                                    }
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(20.dp))
 
                         // "Confirm Reschedule" Button
                         Button(
                             onClick = {
-                                val selectedSlotPair = standardSlots.find { it.first == rescheduleSelectedSlot } ?: standardSlots[0]
-                                val newTimingString = "$rescheduleSelectedDay • ${selectedSlotPair.first} - ${selectedSlotPair.second}"
                                 if (bookingToReschedule != null) {
+                                    val requestedStart = parseTimeToMinutes(rescheduleSelectedSlot)
+                                    val requestedEnd = requestedStart + bookingToReschedule.durationMinutes
+                                    
+                                    val overlappingBooking = bookingsList.find { b ->
+                                        if (b.status == "cancelled") return@find false
+                                        if (b.id == bookingToReschedule.id) return@find false
+                                        val bTiming = b.timing.uppercase()
+                                        val isSameDay = bTiming.contains(rescheduleSelectedDay) || 
+                                          (rescheduleSelectedDay == today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.US).uppercase().take(3) && bTiming.contains("TODAY"))
+                                        if (!isSameDay) return@find false
+
+                                        val parsedDayAndTime = parseBookingDayAndTime(b, calendarDays) ?: return@find false
+                                        val bStartMin = parsedDayAndTime.second
+                                        val bEndMin = bStartMin + b.durationMinutes
+
+                                        val overlap = requestedStart < bEndMin && bStartMin < requestedEnd
+                                        overlap
+                                    }
+                                    
+                                    if (overlappingBooking != null) {
+                                        alertMessage = "You already have another session scheduled during this time."
+                                        return@Button
+                                    }
+
+                                    val selectedSlotPair = standardSlots.find { it.first == rescheduleSelectedSlot } ?: standardSlots[0]
+                                    val newTimingString = "$rescheduleSelectedDay • ${selectedSlotPair.first} - ${selectedSlotPair.second}"
                                     viewModel.rescheduleBooking(bookingToReschedule.id, newTimingString, onComplete = {
                                         bookingSuccessData = BookingConfirmationData(
                                             expertName = rescheduleExpert?.name ?: "Mentor",
@@ -17546,8 +18348,8 @@ fun PremiumBookingCalendarScreen(
                                 }
                                 activeRescheduleBookingId = null
                             },
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6200EE)),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp)
@@ -17558,6 +18360,18 @@ fun PremiumBookingCalendarScreen(
                     }
                 }
             }
+        }
+
+        selectedBookingForDetails?.let { booking ->
+            SessionDetailsDialog(
+                booking = booking,
+                viewModel = viewModel,
+                onDismiss = { selectedBookingForDetails = null },
+                onReschedule = {
+                    activeRescheduleBookingId = booking.id
+                    selectedBookingForDetails = null
+                }
+            )
         }
     }
 }
@@ -17914,7 +18728,7 @@ fun LearningRequestsFeedScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    AvatarImage(name = request.learner_id, size = 32)
+                                    AvatarImage(name = request.learner_id, size = 32, avatarUrl = request.learner_id)
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = if (request.learner_id.contains("senior")) "Senior Member Ramesh" else "Learner Beta",
